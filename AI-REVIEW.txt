@@ -1,0 +1,59 @@
+CHATCLEANER: ТОЧКА ВХОДА ДЛЯ QWEN / DEEPSEEK
+
+Репозиторий: https://github.com/libjam12-dotcom/TG
+
+Проведи независимое ревью и доработку инвайтинга по ТЗ ниже. Читай код по Raw-ссылкам; не ограничивайся общими советами. Сначала ТЗ и документация, затем основной контроллер, Operations и UI, далее необходимые зависимости и тесты. Не нужно загружать весь репозиторий в контекст сразу.
+
+Не выполняй реальные отправки/инвайты, не подключай реальные аккаунты и не обходи ограничения Telegram. В исходниках синтетические ID, локальный снимок не тождествен production. Тесты не доказывают реального добавления. Если ссылка недоступна, прямо укажи это; не утверждай, что файл прочитан.
+
+Версия исходников зафиксирована коммитом 4553ef01a868f754f5846ed394318f615b26f6c8.
+
+1. START-HERE.txt
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/START-HERE.txt
+
+2. chatcleaner-developer/README.md
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/README.md
+
+3. chatcleaner-developer/docs/INVITING.md
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/docs/INVITING.md
+
+4. chatcleaner-developer/docs/ACCEPTANCE.md
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/docs/ACCEPTANCE.md
+
+5. chatcleaner-developer/docs/SOURCE-STATUS.md
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/docs/SOURCE-STATUS.md
+
+6. chatcleaner-developer/docs/VERIFICATION.md
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/docs/VERIFICATION.md
+
+7. chatcleaner-developer/scanner/manual_invite_campaign.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/manual_invite_campaign.py
+
+8. chatcleaner-developer/scanner/operations.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/operations.py
+
+9. chatcleaner-developer/manual-invite-campaign.js
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/manual-invite-campaign.js
+
+10. chatcleaner-developer/scanner/owner_sender.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/owner_sender.py
+
+11. chatcleaner-developer/scanner/operation_workbench.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/operation_workbench.py
+
+12. chatcleaner-developer/scanner/invite_progress.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/invite_progress.py
+
+13. chatcleaner-developer/scanner/spambot_check.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/spambot_check.py
+
+14. chatcleaner-developer/scanner/tests/test_manual_rpc_regression.py
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/tests/test_manual_rpc_regression.py
+
+15. chatcleaner-developer/tests/manual-invite-campaign.test.cjs
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/tests/manual-invite-campaign.test.cjs
+
+16. chatcleaner-developer/scanner/requirements.txt
+https://raw.githubusercontent.com/libjam12-dotcom/TG/4553ef01a868f754f5846ed394318f615b26f6c8/chatcleaner-developer/scanner/requirements.txt
+
+Другие исходники и тесты доступны через публичный репозиторий. Требуемый ответ: доказанные дефекты с файлами/функциями, минимальный patch, результаты тестов и оставшиеся неопределённости. Исторический общий BadRequestError не позволяет восстановить потерянный RPC enum; синтетический CHAT_MEMBER_ADD_FAILED из теста не является доказательством реальной причины.
