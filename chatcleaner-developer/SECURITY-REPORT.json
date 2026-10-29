@@ -1,0 +1,25 @@
+{
+  "files_checked": 205,
+  "issues": [],
+  "synthetic_negative_test_credentials": [
+    {
+      "file": "scanner/tests/test_posting_policy.py",
+      "line": 57,
+      "kind": "credential_url"
+    }
+  ],
+  "pass": true,
+  "scope": "source-only handover, no publication or access granted",
+  "known_source_secret_comparison": "PASS, local comparison; no values or mapping distributed",
+  "live_data_included": false,
+  "git_history_included": false,
+  "session_archives_included": false,
+  "deployment_keys_included": false,
+  "network_default": "external Python sockets disabled; loopback only; not OS sandbox",
+  "limitations": [
+    "Automated pattern checks are not proof of absence of every unknown secret",
+    "Two baseline owner-assistant tests remain failing; see docs/VERIFICATION.md",
+    "Eight fixture-dependent tests explicitly skipped",
+    "No fresh pip installation or real Telegram acceptance performed"
+  ]
+}

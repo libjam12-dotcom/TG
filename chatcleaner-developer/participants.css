@@ -1,0 +1,34 @@
+.participants-history { margin: 1rem 0; }
+.participants-history select { max-width: 100%; }
+.participants-people { max-height: 28rem; overflow: auto; margin: 1rem 0; border: 1px solid var(--border, #dbe2ea); border-radius: .75rem; }
+.participants-person { display: flex; align-items: flex-start; gap: .75rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border, #dbe2ea); overflow-wrap: anywhere; }
+.participants-person:last-child { border-bottom: 0; }
+.participants-person input { flex: 0 0 auto; margin-top: .25rem; }
+.participants-person span { min-width: 0; }
+.participants-person small { display: block; color: var(--muted, #657286); margin-top: .25rem; }
+.participants-person.excluded { opacity: .65; }
+.participants-results .ls-actions { flex-wrap: wrap; }
+#participant-parser textarea { width: 100%; box-sizing: border-box; }
+#participant-parser details { margin: 1rem 0; }
+#participant-parser summary { cursor: pointer; }
+#participant-parser .ls-columns { gap: 0 16px; }
+#participant-parser .ls-field { margin: 12px 0; }
+#participant-parser .ls-section form { margin: 0; }
+#participant-parser .ls-section { margin-bottom: 16px; }
+#participants-copy-notice:empty { display: none; }
+.participants-folder-sources { max-height: 22rem; overflow: auto; margin: 1rem 0; border: 1px solid var(--border, #dbe2ea); border-radius: .75rem; }
+.participants-folder-source { display: flex; align-items: flex-start; gap: .75rem; padding: .8rem 1rem; border-bottom: 1px solid var(--border, #dbe2ea); overflow-wrap: anywhere; }
+.participants-folder-source:last-child { border-bottom: 0; }
+.participants-folder-source input { flex: 0 0 auto; margin-top: .25rem; }
+.participants-folder-source span { min-width: 0; }
+.participants-folder-source small { display: block; margin-top: .25rem; color: var(--muted, #657286); }
+.participants-folder-source.excluded { opacity: .65; }
+.participants-folder .ls-actions { flex-wrap: wrap; }
+.participants-progress { margin: 1rem 0; }
+.participants-progress progress { width: 100%; }
+.participants-source-results { padding-left: 1.25rem; overflow-wrap: anywhere; }
+.participants-source-results li { margin-bottom: .75rem; }
+#operations[data-direct-action] > nav.ls-actions { flex-direction: row; margin-bottom: 16px; }
+#operations[data-direct-action] .ls-field { margin: 12px 0; }
+#operations[data-direct-action] .ls-section { margin-bottom: 16px; }
+#op-inline-review { scroll-margin-top: 1rem; }

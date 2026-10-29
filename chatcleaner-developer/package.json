@@ -1,0 +1,1 @@
+{"name":"chatcleaner-local-handover","private":true,"scripts":{"test":"node --test tests/*.test.cjs"},"engines":{"node":">=20"}}

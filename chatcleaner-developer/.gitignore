@@ -1,0 +1,14 @@
+.venv/
+.local-data/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+*.session*
+*.sqlite*
+*.db*
+tdata/
+*.zip
+*.log
+node_modules/

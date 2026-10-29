@@ -1,0 +1,21 @@
+.workbench,.workbench-card{min-width:0;overflow-wrap:anywhere}
+.workbench{padding:22px}
+.workbench-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.workbench .ls-field{margin-bottom:14px}
+.workbench-grid .ls-field{margin-bottom:0}
+.workbench .ls-field,.workbench input,.workbench select,.workbench textarea{min-width:0;max-width:100%;box-sizing:border-box}
+.workbench textarea{width:100%;resize:vertical}
+.workbench [hidden]{display:none!important}
+.workbench-card{border:1px solid var(--border,#dbe3e8);border-radius:12px;margin:16px 0;padding:14px}
+.workbench-card summary{cursor:pointer;font-weight:600}
+.workbench h3{margin-top:26px}
+.workbench-confirm{display:flex;gap:10px;align-items:flex-start;margin-top:18px}
+.workbench-confirm input{flex:none;margin-top:4px}
+.workbench-list{display:grid;gap:12px}
+.workbench-list article{border:1px solid var(--border,#dbe3e8);border-radius:12px;padding:14px}
+.workbench-counts{display:flex;gap:12px;flex-wrap:wrap}
+.workbench-counts div{padding:12px 18px;border:1px solid var(--border,#dbe3e8);border-radius:10px}
+.workbench-counts dd{font-size:24px;font-weight:600;margin:6px 0 0}
+.workbench .button{max-width:100%;white-space:normal}
+.workbench :is(button,input,textarea,select):focus-visible,.workbench-card button:focus-visible{outline:3px solid #3b82f6;outline-offset:3px}
+@media(max-width:640px){.workbench{padding:16px}.workbench-grid{grid-template-columns:1fr}.workbench .button{min-height:44px}}

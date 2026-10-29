@@ -1,0 +1,10 @@
+'use strict';
+(()=>{
+ const nativeFetch=window.fetch.bind(window);let leaving=false;
+ function login(reason='expired'){if(leaving)return;leaving=true;location.replace('/login?reason='+reason+(/^#[a-z][\w-]{0,50}$/i.test(location.hash)?location.hash:''));}
+ async function refreshIdentity(){try{const r=await nativeFetch('/auth/me',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(10000)});if(r.status===401){login();return;}if(!r.ok)return;const user=await r.json();const changed=window.panelIdentity?.role!==user.role;window.panelIdentity=user;if(changed)window.dispatchEvent(new Event('panel-identity'));document.querySelectorAll('[data-panel-identity]').forEach(el=>{el.textContent=(user.role==='owner'?'Владелец':'Администратор')+' · '+user.username;el.title='Текущий вход в этот кабинет';el.hidden=false;});}catch{}}
+ window.fetch=async(...args)=>{let response;try{response=await nativeFetch(...args);}catch(error){if(['TimeoutError','AbortError'].includes(error.name))throw Error('Сервер не успел ответить. Повторите действие через несколько секунд.');if(error instanceof TypeError)throw Error('Нет соединения с сервером. Проверьте интернет и повторите действие.');throw error;}let url;try{url=new URL(args[0] instanceof Request?args[0].url:String(args[0]),location.href);}catch{}if(response.status===401&&url?.origin===location.origin&&url.pathname.startsWith('/api/'))login();return response;};
+ document.addEventListener('click',async event=>{const button=event.target.closest('[data-panel-logout]');if(!button)return;button.disabled=true;try{const response=await nativeFetch('/auth/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Panel-Request':'1'},credentials:'same-origin',body:'{}',signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error();login('logout');}catch{button.disabled=false;const text='Не удалось завершить сессию. Проверьте соединение и нажмите «Выйти» ещё раз.';if(typeof window.toast==='function')window.toast(text);else alert(text);}});
+ refreshIdentity();
+ setInterval(()=>{if(document.visibilityState==='visible'&&!leaving)refreshIdentity();},60000);
+})();

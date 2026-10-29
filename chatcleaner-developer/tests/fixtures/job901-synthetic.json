@@ -1,0 +1,65 @@
+{
+  "fixture_source": "Entirely synthetic, not a production export",
+  "job_id": 901,
+  "state": "stopped",
+  "resolution": "on_dispatch",
+  "stop_reason": "invite_membership_unconfirmed",
+  "counts": {
+    "total": 3,
+    "attempts": 3,
+    "added": 0,
+    "restricted": 2,
+    "uncertain": 1,
+    "pending": 0
+  },
+  "items": [
+    {
+      "id": 1,
+      "user_name": "recipient_mutual",
+      "state": "restricted",
+      "diagnosis": {
+        "source": "manual-invite-campaign-v1",
+        "code": "UserNotMutualContactError",
+        "reason": "Telegram отклонил добавление этого получателя: требуется взаимный контакт с отправителем.",
+        "invitation_requested": true,
+        "request_outcome_unknown": false
+      },
+      "finished_at": "2020-01-01T00:00:00+00:00",
+      "attempted_at": "2020-01-01T00:00:00+00:00"
+    },
+    {
+      "id": 2,
+      "user_name": "recipient_privacy",
+      "state": "restricted",
+      "diagnosis": {
+        "source": "manual-invite-campaign-v1",
+        "code": "privacy_restricted",
+        "reason": "Telegram сообщил: настройки приватности получателя запрещают прямое добавление в группу.",
+        "invitation_requested": true,
+        "request_outcome_unknown": false
+      },
+      "finished_at": "2020-01-01T00:00:01+00:00",
+      "attempted_at": "2020-01-01T00:00:01+00:00"
+    },
+    {
+      "id": 3,
+      "user_name": "recipient_peerflood",
+      "state": "uncertain",
+      "diagnosis": {
+        "source": "manual-invite-campaign-v1",
+        "code": "invite_membership_unconfirmed",
+        "reason": "Telegram остановил кампанию; автоматического повтора нет.",
+        "invitation_requested": true,
+        "request_outcome_unknown": true,
+        "verification_error": {
+          "source": "rpc_error",
+          "code": "PeerFloodError",
+          "reason": "Telegram ограничил действия аккаунта. Задания остановлены; смена аккаунта автоматически не выполняется."
+        }
+      },
+      "finished_at": "2020-01-01T00:00:02+00:00",
+      "attempted_at": "2020-01-01T00:00:02+00:00"
+    }
+  ],
+  "stopped_at": "2020-01-01T00:00:00.000000+00:00"
+}

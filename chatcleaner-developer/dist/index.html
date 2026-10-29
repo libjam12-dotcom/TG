@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head><script src="/session.js?v=client-readiness-20261012-r2" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12394c">
+  <meta name="description" content="Chatcleaner: поиск лидов, подбор Telegram-сообществ, антиспам и публикации.">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chatcleaner — управление Telegram</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%230b7285'/%3E%3Cpath d='M9 19 31 10l-7 22-6-9-9-4Zm9 4 13-13' fill='none' stroke='white' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?v=client-readiness-20261012-r2">
+  <link rel="stylesheet" href="operation-preview.css?v=forum-topics-20261019-r1">
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Главная навигация">
+      <a href="#home" class="brand"><span class="brand-mark" id="brand-icon"></span><span>Chatcleaner<small>Рабочее пространство</small></span></a>
+      <div class="workspace"><span class="workspace-avatar">D</span><div><strong>Dubai Community</strong><small>Сеть групп и каналов</small></div><span class="workspace-dots">•••</span></div>
+      <nav id="nav"></nav>
+      <div class="sidebar-bottom"><div class="demo-label"><span class="dot"></span>Антиспам · лиды · контент</div><p>Рабочие данные сохраняются на сервере.</p><div class="studio">Сделано в <strong>SignM</strong><span>v0.5</span></div></div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="topbar-left"><button class="icon-button mobile-menu" id="menu-toggle" aria-label="Открыть меню"></button><span class="breadcrumb">Dubai Community</span><span class="breadcrumb-divider">/</span><span id="breadcrumb-current">Обзор</span></div>
+        <div class="topbar-right"><span class="demo-pill">Рабочий модуль</span><label class="role-switch" hidden><span>Проверка роли</span><select id="role-select" aria-label="Предпросмотр роли"><option value="owner">Владелец</option><option value="manager">Управляющий</option><option value="content">Контент-менеджер</option></select></label><span class="avatar user-avatar" id="user-avatar" aria-hidden="true">Н</span><span class="panel-identity" data-panel-identity hidden></span><button type="button" class="text-button" data-panel-logout>Выйти</button></div>
+      </header>
+      <main id="main" tabindex="-1"></main>
+      <footer class="page-footer"><span>Подключаем рабочие модули…</span><span>Состояние подключения — внутри раздела.</span></footer>
+    </div>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="antispam.js?v=conditional-quarantine-20261028-r1" defer></script>
+<script src="parser.js?v=client-readiness-20261012-r2" defer></script>
+  <script src="conversations.js?v=client-readiness-20261012-r2" defer></script>
+  <script src="owner-sender.js?v=client-readiness-20261012-r2" defer></script>
+  <script src="owner-conversations.js?v=signm-geo-scope-20261020-r15" defer></script>
+  <link rel="stylesheet" href="signm-pipeline.css?v=signm-owner-contact-20261019-r9">
+  <script src="signm-pipeline.js?v=signm-geo-scope-20261020-r15" defer></script>
+  <script src="marketing.js?v=signm-owner-contact-20261019-r8" defer></script>
+  <script src="bot-notifications.js?v=client-readiness-20261012-r2" defer></script>
+  <script src="scanner.js?v=full-check-queue-20261015-r1" defer></script>
+  <script src="publisher.js?v=client-readiness-20261012-r2" defer></script>
+  <link rel="stylesheet" href="audience.css?v=client-readiness-20261012-r2">
+  <script src="audience.js?v=client-readiness-20261012-r2" defer></script>
+  <link rel="stylesheet" href="participants.css?v=folder-parsing-20261015-r1">
+  <script src="participants.js?v=client-transfer-pause-20261016-r1" defer></script>
+  <script src="operation-topics.js?v=signm-geo-scope-20261020-r15" defer></script>
+  <script src="operation-preview.js?v=signm-geo-scope-20261020-r15" defer></script>
+  <script src="operation-campaigns.js?v=campaign-settings-20261018-r1" defer></script>
+  <script src="operation-tracking.js?v=panel-acceptance-20261029-r1" defer></script>
+  <script src="ufc333-campaign.js?v=ufc333-campaign-20261018-r1" defer></script>
+  <script src="operation-budgets.js?v=ticket-route-20261018-r1" defer></script>
+  <link rel="stylesheet" href="operation-workbench.css?v=phase1-20261019-r1">
+  <script src="operation-workbench.js?v=signm-geo-scope-20261020-r15" defer></script>
+  <script src="isolated-contact-batch.js?v=isolated-contact-batch-20261022-r1" defer></script>
+  <script src="manual-invite-campaign.js?v=invite-followup-20261029-r1" defer></script>
+  <script src="isolated-invite-campaign.js?v=quick-invites-20261029-r1" defer></script>
+  <script src="operations.js?v=reconnect-protection-20261029-r1" defer></script>
+  <link rel="stylesheet" href="simple-operations.css?v=simple-ui-20261019-r1">
+  <script src="simple-operations.js?v=quick-invites-20261029-r1" defer></script>
+  <script src="app.js?v=panel-skip-link-20261029-r1" defer></script>
+<script src="/community-link-loader.js?v=folder-parsing-20261015-ui-fix1" defer></script></body>
+</html>
