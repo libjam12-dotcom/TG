@@ -257,7 +257,8 @@ class ManualInviteCampaign(IsolatedInvite):
 
     def historical(self, target, uid, jid=None):
         return bool(self.store.rows('SELECT 1 FROM op_items i JOIN op_jobs j ON j.id=i.job '
-            "WHERE i.chat_id=? AND i.user_id=? AND i.job!=? AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending')) "
+            "WHERE j.kind='invite' AND i.chat_id=? AND i.user_id=? AND i.job!=? "
+            "AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending')) "
             'UNION SELECT 1 FROM op_invited WHERE chat_id=? AND user_id=? LIMIT 1', (target, uid, jid or -1, target, uid)))
 
     def competing(self, config, jid=None):
@@ -819,7 +820,8 @@ class ManualInviteCampaign(IsolatedInvite):
             if quick and item['user_id'] is None:
                 self.seal_recipient(ctx, item, user)
             if self.historical(cfg['target_id'], user.id, ctx['job_id']):
-                return dict(state='duplicate_skipped', diagnosis={'code': 'target_history_exists'}), False, False
+                return dict(state='duplicate_skipped', diagnosis={'code': 'target_history_exists',
+                    'reason': 'Для этого человека уже есть запись о прямом приглашении в эту группу. Новый запрос не отправлен.'}), False, False
             before = await self.read(ctx, lambda: self.ops.read_membership(ctx['client'], group, user))
             if before['member'] is True:
                 return dict(state='already_member', diagnosis={'code': 'member_before_invite', 'member_before': before}), False, False
