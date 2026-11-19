@@ -80,12 +80,12 @@
     {
       "file": "chatcleaner-developer/antispam/src/antispam/telegram/handlers.py",
       "source_sha256": "2f6559780535cd5ad4982706bd1fd4864491495a1918f3ad1f599752417e4056",
-      "sanitized_sha256": "fe9fd268539b531eccfd3405c6822a1dc2de891cac4421d56a76e3d4e2f698db"
+      "sanitized_sha256": "029d8a2d365b12e9d0896a3a709c1c3c5688ef3710bd6ac42a8d87e7f6fac78e"
     },
     {
       "file": "chatcleaner-developer/antispam/src/antispam/telegram/menus.py",
       "source_sha256": "7bb4d84d7342c7ca184a1e137d8ac46c2b7a74bc70656f5276ff7585be05ae29",
-      "sanitized_sha256": "7bb4d84d7342c7ca184a1e137d8ac46c2b7a74bc70656f5276ff7585be05ae29"
+      "sanitized_sha256": "2ec8d204349913868510e118d11f112ff368543da4317fc020af241ff3107568"
     },
     {
       "file": "chatcleaner-developer/antispam/src/antispam/web/__init__.py",
@@ -265,7 +265,7 @@
     {
       "file": "chatcleaner-developer/scanner/publisher.py",
       "source_sha256": "6addc03ba4f18bd001dddf2008386aaebb175c24b6d8da110d8f33f78edd63ba",
-      "sanitized_sha256": "6addc03ba4f18bd001dddf2008386aaebb175c24b6d8da110d8f33f78edd63ba"
+      "sanitized_sha256": "e29382a717051eb3dbc4208458a5e294232af15a71d35e2a132233bc18a8bdfd"
     },
     {
       "file": "chatcleaner-developer/scanner/qa_invite_adminlog.py",
@@ -315,7 +315,7 @@
     {
       "file": "chatcleaner-developer/antispam.js",
       "source_sha256": "1fa9689adf7bc2ef9c0197924dd42d06b9ad3701946ffaa8f6145429c53ba61c",
-      "sanitized_sha256": "1fa9689adf7bc2ef9c0197924dd42d06b9ad3701946ffaa8f6145429c53ba61c"
+      "sanitized_sha256": "5e0298522b1bfdef5e4c1312fb312c22f6d3b1f37116917d4718eadbc41188c5"
     },
     {
       "file": "chatcleaner-developer/app.js",
@@ -440,7 +440,7 @@
     {
       "file": "chatcleaner-developer/owner-sender.js",
       "source_sha256": "62acce3b82fc19e80fe2005f6456a587fb3ad8c62db4e79c543a788af8276939",
-      "sanitized_sha256": "b547f40a72be4a0a858d48445ab1c189c2d0d123c151ec093614a364d4515aa6"
+      "sanitized_sha256": "02b74987f0379714b516b936daa38bdc8c2b013b6237ca26f4f9a678f104d61a"
     },
     {
       "file": "chatcleaner-developer/parser.js",
