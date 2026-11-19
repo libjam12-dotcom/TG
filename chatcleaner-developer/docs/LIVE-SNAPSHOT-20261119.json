@@ -1,6 +1,6 @@
 {
   "date": "2026-11-19",
-  "source": "read-only export of deployed code; no runtime data",
+  "source": "Sanitized deployed-code snapshot with candidate regression tests and client instructions; no runtime data",
   "files": [
     {
       "file": "chatcleaner-developer/antispam/src/antispam/__init__.py",
@@ -179,8 +179,8 @@
     },
     {
       "file": "chatcleaner-developer/scanner/manual_invite_campaign.py",
-      "source_sha256": "3e6dd43def981570c80b32a3dba37fd54cdcd060e5e21137149fe2e316d64292",
-      "sanitized_sha256": "3e6dd43def981570c80b32a3dba37fd54cdcd060e5e21137149fe2e316d64292"
+      "source_sha256": "8862a53a84f270d2119b9bcde266c445ff83fbcaa44e24610177ddef44fd4b6d",
+      "sanitized_sha256": "8862a53a84f270d2119b9bcde266c445ff83fbcaa44e24610177ddef44fd4b6d"
     },
     {
       "file": "chatcleaner-developer/scanner/marketing.py",
@@ -269,8 +269,8 @@
     },
     {
       "file": "chatcleaner-developer/scanner/qa_invite_adminlog.py",
-      "source_sha256": "6f7158cc29a9e42f9f4ebecf4c72668d02908c08412d5c833d30fa8cd02c741d",
-      "sanitized_sha256": "2b9f04f0b2ff1bc7854f3e1b92f2192b458f1431d04d600607c52f5564d4f2c9"
+      "source_sha256": "99107152bb98974cb6636f5622217016a75e5f59ce4c373c9fb097fd8cc2de98",
+      "sanitized_sha256": "41addd5e56249885db34b5e74de0e1b6a1c9cf400329051f5076770bd7cae722"
     },
     {
       "file": "chatcleaner-developer/scanner/qualification.py",
@@ -379,8 +379,8 @@
     },
     {
       "file": "chatcleaner-developer/manual-invite-campaign.js",
-      "source_sha256": "30fbb1d46fd325c0825d1c602abb833157a2ca5bb6b511d8b23798396dd90e37",
-      "sanitized_sha256": "30fbb1d46fd325c0825d1c602abb833157a2ca5bb6b511d8b23798396dd90e37"
+      "source_sha256": "4a972a2684ee4d8464ac5a8d1545339a2f5d2fd940fe6494d598573356b4bfdc",
+      "sanitized_sha256": "4a972a2684ee4d8464ac5a8d1545339a2f5d2fd940fe6494d598573356b4bfdc"
     },
     {
       "file": "chatcleaner-developer/marketing.js",
@@ -496,7 +496,44 @@
       "file": "chatcleaner-developer/styles.css",
       "source_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07",
       "sanitized_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/tests/test_manual_invite_campaign.py",
+      "source_sha256": "aa68a08f584e900f0c1f6ae27896e668e4ec86d2d0e36113c01830f08f2c310e",
+      "sanitized_sha256": "81730a047f2dafd80502e8f30e8b47517f56348e8940105b52216a237e65e492",
+      "origin": "candidate test or instruction; not exported runtime data"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/tests/test_quick_manual_invite.py",
+      "source_sha256": "20d03f2ce58ad40511701e861f7a1561a828d2744f8f217f5994622e235ce207",
+      "sanitized_sha256": "2bc0eabdf3ae1ce9db8e67c714c75da007fb0749169ef0c046cfee5cba031e28",
+      "origin": "candidate test or instruction; not exported runtime data"
+    },
+    {
+      "file": "chatcleaner-developer/tests/manual-invite-campaign.test.cjs",
+      "source_sha256": "6c0533aeab535ba251a2749d04019902e3c443f1efc5e186bbf6140336103788",
+      "sanitized_sha256": "6352a1f1b412db82a3ef7c4d117a441d0ae2cf68fe1e740489999d1ea84104b7",
+      "origin": "candidate test or instruction; not exported runtime data"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/tests/test_qa_invite_adminlog.py",
+      "source_sha256": "60523edcebab06f044b238d88a2a436e7d8b5d9ec01be4db7adc7572d3a68f00",
+      "sanitized_sha256": "99f78f9e97b1f92609632e987a803797d8f4f2ed719af7ce20eb2aae5ba057e2",
+      "origin": "candidate test or instruction; not exported runtime data"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/tests/test_saved_invite_adminlog.py",
+      "source_sha256": "e3248c719574eed92bf63fe8e06066131e0d2561d414adee2d14b461aac0c0ae",
+      "sanitized_sha256": "e3248c719574eed92bf63fe8e06066131e0d2561d414adee2d14b461aac0c0ae",
+      "origin": "candidate test or instruction; not exported runtime data"
+    },
+    {
+      "file": "chatcleaner-developer/docs/CLIENT-INSTRUCTIONS.md",
+      "source_sha256": "12f2528e1526125275d51221c7cdc707fa560a95e98630fbd1912f2f93e84947",
+      "sanitized_sha256": "12f2528e1526125275d51221c7cdc707fa560a95e98630fbd1912f2f93e84947",
+      "origin": "candidate test or instruction; not exported runtime data"
     }
   ],
-  "release_update": "invite-history-retry-20261119-r1"
+  "release_update": "invite-selfservice-20261119-r2",
+  "verification": "Install receipt verifies three raw source hashes and zero Telegram write requests; no new invite acceptance or proven cause for prior unknown result."
 }

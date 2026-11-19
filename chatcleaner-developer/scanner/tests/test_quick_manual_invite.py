@@ -44,6 +44,72 @@ class QuickTests(legacy.ManualTests):
         await self.run_worker()
         return await self.manual.status(saved['job_id']), req
 
+    async def test_verified_goal_wins_when_goal_and_both_caps_reached_together(self):
+        saved = await self.quick_saved(cfg=self.config(2, success_goal=1).model_copy(update={'max_attempts':1, 'account_day_attempt_cap':1}))
+        result, _ = await self.quick_run(saved)
+        self.assertEqual(result['stop_reason'], 'verified_goal_reached')
+        self.assertEqual(result['state'], 'completed')
+        self.assertEqual(result['counts']['added'], 1)
+        self.assertEqual(result['counts']['pending'], 1)
+        self.assertFalse(result['can_resume'])
+        self.assertEqual(len(self.client.calls), 1)
+
+    async def test_resume_status_respects_campaign_and_daily_limits(self):
+        saved = await self.quick_saved(count=2)
+        record = self.manual.record(saved['job_id'])
+        record.update(state='paused', attempts_claimed=record['config']['max_attempts'])
+        self.manual.save(record)
+        self.assertFalse((await self.manual.status(saved['job_id']))['can_resume'])
+        record['attempts_claimed'] = 0
+        record['config']['account_day_attempt_cap'] = 1
+        self.manual.save(record)
+        with self.ops.store.db:
+            self.ops.store.db.execute('UPDATE op_items SET attempted_at=? WHERE job=? AND id=(SELECT min(id) FROM op_items WHERE job=?)',
+                (datetime.now(timezone.utc).isoformat(), saved['job_id'], saved['job_id']))
+        self.assertFalse((await self.manual.status(saved['job_id']))['can_resume'])
+        with self.ops.store.db:
+            self.ops.store.db.execute('UPDATE op_items SET attempted_at=NULL WHERE job=?', (saved['job_id'],))
+        self.assertTrue((await self.manual.status(saved['job_id']))['can_resume'])
+        self.assertEqual(self.client.calls, [])
+
+    async def test_resume_status_honors_connection_identity_cooldown_and_saved_error(self):
+        saved = await self.quick_saved(count=2)
+        record = self.manual.record(saved['job_id']);record['state']='paused';self.manual.save(record)
+        self.assertTrue((await self.manual.status(saved['job_id']))['can_resume'])
+        self.client.is_connected = lambda:False
+        result=await self.manual.status(saved['job_id'])
+        self.assertFalse(result['can_resume']);self.assertEqual(result['resume_block_reason'],'sender_unavailable')
+        self.client.is_connected = lambda:True
+        with self.ops.store.db:self.ops.store.db.execute("UPDATE op_accounts SET not_before=? WHERE id='primary'",(self.wall+10,))
+        result=await self.manual.status(saved['job_id'])
+        self.assertFalse(result['can_resume']);self.assertEqual(result['resume_block_reason'],'sender_cooldown')
+        with self.ops.store.db:self.ops.store.db.execute("UPDATE op_accounts SET not_before=0,error='PeerFloodError' WHERE id='primary'")
+        result=await self.manual.status(saved['job_id'])
+        self.assertFalse(result['can_resume']);self.assertEqual(result['resume_block_reason'],'sender_restricted')
+        self.assertEqual(self.client.calls,[])
+
+    async def test_existing_membership_get_is_read_only_and_never_resolves_unknown_history(self):
+        self.history_item('uncertain')
+        saved = await self.quick_saved(cfg=self.config(1, retry_after_change_confirmed=True))
+        result, _ = await self.quick_run(saved)
+        item = result['items'][0]
+        before = self.manual.projection_for(5550001001)
+        path='/api/scanner/operations/jobs/'+str(saved['job_id'])+'/items/'+str(item['id'])+'/membership'
+        response=await self.http.get(path)
+        self.assertEqual(response.status_code,200,response.text)
+        absent=response.json()
+        self.assertIs(absent['member'],False)
+        self.assertEqual(absent['attribution'],'current_membership_only')
+        self.assertFalse(absent['invitation_requested']);self.assertFalse(absent['history_changed'])
+        self.assertIn('checked_at',absent)
+        self.client.members.add(item['user_id'])
+        response=await self.http.get(path)
+        self.assertTrue(response.json()['member'])
+        self.assertEqual(self.manual.projection_for(5550001001),before)
+        self.assertEqual(self.ops.store.rows('SELECT state FROM op_invited')[0]['state'],'uncertain')
+        self.assertEqual((await self.manual.status(saved['job_id']))['counts']['added'],0)
+        self.assertEqual(self.client.calls,[])
+
     async def test_empty_response_reports_received_response_without_claiming_privacy(self):
         self.client.ghost = True
         saved = await self.quick_saved(count=1)
@@ -259,7 +325,7 @@ class QuickTests(legacy.ManualTests):
 
     async def test_quick_secondary20_exact_identity_target_and_verified_goal(self):
         secondary = legacy.Client()
-        secondary.me = types.User(id=8492521342, username='holoptic_Fidejussion')
+        secondary.me = types.User(id=5550002001, username='demo_identity_2')
         self.ops.accounts['selected-secondary'] = SimpleNamespace(client=secondary, me=secondary.me, error=None)
         with self.ops.store.db:
             self.ops.store.db.execute('INSERT INTO op_accounts(id,label,telegram_id,username,enabled,created) VALUES(?,?,?,?,?,?)',
@@ -267,7 +333,7 @@ class QuickTests(legacy.ManualTests):
         cfg = manual_invite_campaign.ManualConfig(**dict(self.config(20).model_dump(), account='selected-secondary', telegram_id=secondary.me.id, success_goal=20))
         saved = await self.quick_saved(cfg=cfg)
         self.assertEqual(saved['target']['id'], -1001234501001)
-        self.assertEqual(saved['telegram_id'], 8492521342)
+        self.assertEqual(saved['telegram_id'], 5550002001)
         self.assertEqual(secondary.calls, [])
         result, _ = await self.quick_run(saved)
         self.assertEqual(result['counts']['added'], 20, result)

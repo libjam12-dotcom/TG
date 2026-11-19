@@ -30,7 +30,7 @@ test('start needs explicit confirmation; pause and fresh resume affect only the 
 test('pause intent stays running, disables pause and polls until backend confirms paused',async()=>{const x=harness();await x.module.mount();await x.event('change','account','primary');await x.event('change','target_id',String(target.id));await x.event('input','users','@valid_user');await x.event('input','consent_note','Участник согласился в заявке');await x.event('change','consent_confirmed',true);await x.click('preview');await x.tick();await x.click('draft');await x.event('change','confirmed',true);await x.click('start');x.context.pauseIntent=true;await x.click('pause');assert.match(x.el.innerHTML,/Останавливаем после текущего запроса/);assert.match(x.el.innerHTML,/data-mic="pause" disabled/);assert.match(x.el.innerHTML,/3\. Выполняется/);assert.ok(!x.el.innerHTML.includes('3. На паузе'));x.context.job={...x.context.job,state:'paused',pause_requested:false,can_pause:false,can_resume:true};await x.tick();assert.match(x.el.innerHTML,/3\. На паузе/);assert.ok(!x.el.innerHTML.includes('data-mic="pause"'));});
 
 test('formatted participant lines extract only explicit handles and accept plain handles/profile URLs',()=>{const api=harness().module._test;const parsed=api.parseUsers('Иван Петров — @Some_User\nplain_handle\nhttps://t.me/profile_user\nМария — t.me/another_user');assert.deepEqual(Array.from(parsed.users),['some_user','plain_handle','profile_user','another_user']);assert.equal(parsed.issues.length,0);const d=readyConfig(api);d.users='Иван — @valid_user\nhttps://t.me/another_user';assert.deepEqual(Array.from(api.config(d,accounts,[target]).users),['valid_user','another_user']);});
- test('invalid and duplicate participants identify exact line without stripping names into handles',()=>{const api=harness().module._test;const p=api.parseUsers('Имя без адреса\nИван — @valid_user\n@VALID_USER\n@two_users @other_user\nhttps://t.me/+secret');assert.equal(p.users.length,1);assert.match(p.issues[0],/Строка 1/);assert.match(p.issues[1],/Строка 3.*повторяет строку 2/);assert.match(p.issues[2],/Строка 4/);assert.match(p.issues[3],/Строка 5/);const d=readyConfig(api);d.users='Имя без адреса';assert.match(api.fieldErrors(d,accounts,[target]).users,/Строка 1/);});
+ test('invalid and duplicate participants identify exact line without stripping names into handles',()=>{const api=harness().module._test;const p=api.parseUsers('Имя без адреса\nИван — @valid_user\n@VALID_USER\n@two_users @other_user\nhttps://t.me/+DEVELOPMENT_ONLY');assert.equal(p.users.length,1);assert.match(p.issues[0],/Строка 1/);assert.match(p.issues[1],/Строка 3.*повторяет строку 2/);assert.match(p.issues[2],/Строка 4/);assert.match(p.issues[3],/Строка 5/);const d=readyConfig(api);d.users='Имя без адреса';assert.match(api.fieldErrors(d,accounts,[target]).users,/Строка 1/);});
  test('idle campaign save remains clickable; validation identifies required fields and prevents API save',async()=>{const x=harness();await x.module.mount();assert.match(x.el.innerHTML,/data-mic="quick-draft">Сохранить кампанию/);await x.click('quick-draft');assert.ok(!x.calls.some(c=>c.method==='POST'));assert.match(x.el.innerHTML,/Чтобы сохранить кампанию, исправьте поля/);assert.match(x.el.innerHTML,/id="mic-account" aria-invalid="true" aria-describedby="mic-account-error"/);assert.match(x.el.innerHTML,/id="mic-users-error">Укажите от 1 до 1000/);assert.match(x.el.innerHTML,/от 8 до 500 символов/);});
  test('live field hints update without replacing form or losing raw formatted text in session',async()=>{const x=harness();await x.module.mount();const before=x.writes();const raw='Иван — @valid_user\nИмя без адреса';await x.event('input','users',raw);assert.equal(x.writes(),before);assert.equal(x.nodes['[data-mic-field="users"]'].attributes['aria-invalid'],'true');assert.match(x.nodes['#mic-users-error'].textContent,/Строка 2/);assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).draft.users,raw);await x.event('input','users','Иван — @valid_user');assert.equal(x.nodes['[data-mic-field="users"]'].attributes['aria-invalid'],'false');assert.equal(x.nodes['#mic-users-error'].textContent,'');await x.event('input','interval_seconds','0');assert.match(x.nodes['#mic-interval_seconds-error'].textContent,/целое число от 1 до 86400/);assert.equal(x.writes(),before);});
  test('formatted list is sent as handles only; self-contained full-width/red-state CSS exists',async()=>{const x=harness();await x.module.mount();await x.event('change','account','primary');await x.event('change','target_id',String(target.id));await x.event('input','users','Иван — @valid_user\nhttps://t.me/another_user');await x.event('input','consent_note','Все участники согласились в заявках');await x.event('change','consent_confirmed',true);await x.click('preview');const p=x.calls.find(c=>c.url.endsWith('/preview'));assert.deepEqual(p.body.users,['valid_user','another_user']);assert.match(x.el.innerHTML,/#manual-invite-campaign \.cc-field\{display:flex;flex-direction:column/);assert.match(x.el.innerHTML,/#manual-invite-campaign \[aria-invalid=true\]\{border:2px solid/);assert.match(x.el.innerHTML,/width:100%;min-width:0;border:1px solid/);assert.match(x.el.innerHTML,/@media\(max-width:600px\)/);});
@@ -115,6 +115,96 @@ test('saved empty InvitedUsers response is explained separately from unknown tra
  assert.match(api.diagnosisDetails(saved).reason,/Повтор отключён/);
  assert.ok(!api.diagnosisDetails(saved).reason.includes('приватност'));
  const transport={state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed',reason:'Неизвестный результат: TimeoutError. Повтор отключён.',response:{},verification:[]}};
- assert.match(api.diagnosisDetails(transport).reason,/TimeoutError/);
+ assert.match(api.diagnosisDetails(transport).reason,/неизвестен/);
  assert.ok(!api.diagnosisDetails(transport).reason.includes('вернул ответ'));
+});
+
+async function membershipFixture(){
+ const x=harness();await newPreview(x);await x.tick();await x.click('draft');
+ x.context.job={...x.context.job,state:'stopped',stop_reason:'invite_membership_unconfirmed',can_resume:false,counts:{total:1,attempts:1,added:0,uncertain:1},items:[{id:41,user_id:5550011,user_name:'valid_user',state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed',response:{response_type:'InvitedUsers'},verification:[{member:false}]}}]};
+ await x.click('status');return x;
+}
+function membershipResponse(member=false,extra={}){return {ok:true,json:async()=>({account:'primary',sender_id:5550001001,target:target.id,user_id:5550011,member,checked_at:'2026-11-19T14:08:12+00:00',attribution:'current_membership_only',invitation_requested:false,history_changed:false,...extra})};}
+const membershipCalls=x=>x.calls.filter(c=>c.url.endsWith('/membership'));
+
+test('persisted item offers explicit current participation check; view and GET never send invitations or alter historical count',async()=>{
+ const x=await membershipFixture();assert.equal(membershipCalls(x).length,0);
+ assert.match(x.el.innerHTML,/data-mic="membership:41">Проверить участие/);
+ const writes=x.calls.filter(c=>c.method==='POST').length;
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(false):undefined;
+ await x.click('membership:41');
+ assert.equal(membershipCalls(x).length,1);assert.equal(membershipCalls(x)[0].method,'GET');
+ assert.equal(membershipCalls(x)[0].url,'/api/scanner/operations/jobs/991/items/41/membership');
+ assert.match(x.el.innerHTML,/Сейчас не состоит в группе/);assert.match(x.el.innerHTML,/datetime="2026-11-19T14:08:12\+00:00"/);
+ assert.match(x.el.innerHTML,/а не подтверждение результата прежнего приглашения/);
+ assert.match(x.el.innerHTML,/История и счётчик добавлений не изменены/);
+ assert.match(x.el.innerHTML,/Результат не подтверждён/);
+ assert.equal(x.context.job.counts.added,0);assert.equal(x.context.job.items[0].state,'uncertain');
+ assert.equal(x.calls.filter(c=>c.method==='POST').length,writes);
+ assert.ok(!x.calls.some(c=>/start|retry|resume-outbound/.test(c.url)));
+});
+
+test('membership loading blocks duplicate click; current true and unknown remain separate from past invite',async()=>{
+ const x=await membershipFixture();let finish;
+ x.context.fetchOverride=url=>url.endsWith('/membership')?new Promise(resolve=>{finish=resolve}):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверяем текущее участие/);
+ assert.match(x.el.innerHTML,/data-mic="membership:41" disabled/);
+ await x.click('membership:41');assert.equal(membershipCalls(x).length,1);
+ finish(membershipResponse(true));await x.flush();
+ assert.match(x.el.innerHTML,/Сейчас состоит в группе/);assert.equal(x.context.job.items[0].state,'uncertain');
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(null):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Текущее участие не подтверждено/);
+});
+
+test('membership errors use safe local instructions and preserve historical result',async()=>{
+ const x=await membershipFixture();
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?{ok:false,status:409,json:async()=>({detail:'RAW request=session-secret /private/client/file'})}:undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверка не подтверждена/);
+ assert.match(x.el.innerHTML,/Приглашение не отправлялось/);assert.ok(!x.el.innerHTML.includes('session-secret'));assert.ok(!x.el.innerHTML.includes('/private/client/file'));
+ assert.equal(x.context.job.items[0].state,'uncertain');
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(true,{user_id:99999}):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверка не подтверждена/);assert.ok(!x.el.innerHTML.includes('Сейчас состоит в группе'));
+});
+
+test('late membership read after remount does not attach to another recipient or persist result',async()=>{
+ const x=await membershipFixture();let finish;
+ x.context.fetchOverride=url=>url.endsWith('/membership')?new Promise(resolve=>{finish=resolve}):undefined;
+ await x.click('membership:41');x.module.unmount();
+ x.context.job={...x.context.job,items:[{id:42,user_id:5550022,user_name:'another_user',state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed'}}]};
+ await x.module.mount();const before=x.memory.get('manual-invite-campaign-v1');
+ finish(membershipResponse(true));await x.flush();
+ assert.ok(!x.el.innerHTML.includes('Сейчас состоит в группе'));assert.ok(!x.el.innerHTML.includes('Проверяем текущее участие'));
+ assert.match(x.el.innerHTML,/membership:42/);assert.equal(x.memory.get('manual-invite-campaign-v1'),before);
+});
+
+test('known Telegram enums have safe actionable guidance, unknown RPC raw text is excluded',()=>{
+ const api=harness().module._test;
+ for(const code of ['UserPrivacyRestrictedError','UserNotMutualContactError','UserChannelsTooMuchError','ChatAdminRequiredError','PeerFloodError','FloodWaitError']){
+  const d=api.diagnosisDetails({state:'restricted',diagnosis:{source:'rpc_error',code,reason:'RAW_EXCEPTION request=user phone 123'}});
+  assert.ok(d.nextAction.length>10,code);assert.ok(!d.reason.includes('RAW_EXCEPTION'),code);
+ }
+ const raw=api.diagnosisDetails({state:'uncertain',diagnosis:{verification_error:{code:'BadRequestError',reason:'RAW_EXCEPTION contacts phone',rpc:{message:'UNKNOWN_NEW_RPC'}}}});
+ assert.ok(!raw.reason.includes('RAW_EXCEPTION'));assert.match(raw.reason,/автоматического повтора нет/);
+ const safe=api.diagnosisDetails({state:'restricted',diagnosis:{source:'rpc_error',code:'BadRequestError',reason:'RAW_EXCEPTION',rpc:{message:'USER_PRIVACY_RESTRICTED'}}});
+ assert.match(safe.nextAction,/разрешение на добавление/);
+});
+
+test('resume blocker explains unavailable continuation without exposing a start control',async()=>{
+ const x=await membershipFixture();x.context.job={...x.context.job,state:'paused',counts:{total:2,pending:1,attempts:1,added:0},resume_block_reason:'account_day_attempt_cap_reached',can_resume:false};
+ await x.click('status');assert.match(x.el.innerHTML,/Продолжение недоступно/);assert.match(x.el.innerHTML,/Дневной предел попыток аккаунта исчерпан/);
+ assert.ok(!x.el.innerHTML.includes('data-mic="start"'));
+});
+
+test('active campaign disables participation checking and unresolved usernames have no check control',async()=>{
+ const x=await membershipFixture();x.context.job={...x.context.job,state:'running',can_pause:true};await x.click('status');
+ assert.match(x.el.innerHTML,/data-mic="membership:41" disabled/);await x.click('membership:41');assert.equal(membershipCalls(x).length,0);
+ x.context.job={...x.context.job,state:'draft',items:[{id:41,user_id:null,user_name:'valid_user',state:'pending'}]};await x.click('status');
+ assert.ok(!x.el.innerHTML.includes('data-mic="membership:41"'));
+});
+
+
+test('manual unknown error class never renders raw exception text',()=>{
+ const api=harness().module._test;
+ const d=api.diagnosisDetails({state:'failed',diagnosis:{source:'manual-invite-campaign-v1',code:'BadRequestError',reason:'RAW_EXCEPTION request secret private phone'}});
+ assert.ok(!d.reason.includes('RAW_EXCEPTION'));assert.match(d.reason,/Telegram не подтвердил действие/);
 });

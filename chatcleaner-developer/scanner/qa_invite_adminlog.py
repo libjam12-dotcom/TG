@@ -1,4 +1,4 @@
-"""One fixed QA130 admin-log read through an already connected runtime.
+"""Bounded saved-invite and fixed QA admin-log reads through an existing runtime.
 
 No account construction, auth, contacts, messages, invitations or state writes.
 This endpoint reports historical metadata, never invitation eligibility/success.
@@ -6,7 +6,7 @@ This endpoint reports historical metadata, never invitation eligibility/success.
 import asyncio
 import copy
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import math
 import time
 from typing import Literal
@@ -107,6 +107,7 @@ class QaInviteAdminLog:
         self.router = APIRouter(dependencies=[Depends(qa_admin_only)])
         self.router.add_api_route('/qa/invite-adminlog', self.read, methods=['GET'])
         self.router.add_api_route('/qa/russkie-adminlog', self.read_russkie, methods=['GET'])
+        self.router.add_api_route('/jobs/{jid}/items/{iid}/invite-adminlog', self.read_item, methods=['GET'])
 
     @staticmethod
     def remaining(deadline):
@@ -140,7 +141,7 @@ class QaInviteAdminLog:
             self.remaining(deadline)
         if current is not account or current.client is not client or current.me is not identity:
             raise fail(409, 'Подключение или личность изменились. Результат чтения отброшен.')
-        if binding is not None and self.source126(deadline=deadline) != binding:
+        if binding is not None and (self.source_item(binding['job_id'], binding['item_id']) if binding.get('kind') == 'saved_item' else self.source126(deadline=deadline)) != binding:
             raise fail(409, 'Привязка сохранённого задания126 изменилась. Результат чтения отброшен.')
         if deadline is not None:
             self.remaining(deadline)
@@ -185,6 +186,33 @@ class QaInviteAdminLog:
         if deadline is not None:
             self.remaining(deadline)
         return binding
+
+    def source_item(self, jid, iid):
+        rows = self.ops.store.rows('SELECT i.id,i.job,i.chat_id,i.user_id,i.attempted_at,j.account,j.telegram_id,j.kind '
+            'FROM op_items i JOIN op_jobs j ON j.id=i.job WHERE j.id=? AND i.id=?', (jid, iid))
+        if len(rows) != 1:
+            raise fail(404, 'Сохранённый получатель не найден.')
+        row = rows[0]
+        if row['kind'] != 'invite' or type(row['user_id']) is not int or row['user_id'] <= 0:
+            raise fail(409, 'Журнал доступен только для закреплённого получателя прямого приглашения.')
+        try:
+            stamp = datetime.fromisoformat(row['attempted_at'])
+            if not stamp.tzinfo:
+                raise ValueError()
+        except (TypeError, ValueError):
+            raise fail(409, 'В этом задании нет сохранённой попытки приглашения. Журнал не читался.') from None
+        return dict(kind='saved_item', job_id=jid, item_id=iid, account=row['account'],
+            sender_id=row['telegram_id'], target_id=row['chat_id'], user_id=row['user_id'],
+            attempted_at=row['attempted_at'])
+
+    async def read_item(self, jid: int, iid: int):
+        deadline = time.monotonic() + READ_TIMEOUT
+        binding = self.source_item(jid, iid)
+        result = await self.read_context(account_id=binding['account'], sender_id=binding['sender_id'],
+            target_id=binding['target_id'], recipient_ids=frozenset((binding['user_id'],)),
+            since=datetime.fromisoformat(binding['attempted_at']).astimezone(timezone.utc) - timedelta(seconds=2),
+            scope='saved_invite_item', binding=binding, deadline=deadline)
+        return result
 
     async def read(self, scope: Literal['qa130-murk'] = Query(...)):
         if scope != QA_SCOPE:
@@ -252,18 +280,23 @@ class QaInviteAdminLog:
                         raise fail(502, 'Telegram вернул неизвестный ответ журнала. Вывод о приглашении не сделан.')
                     raw = result.events[:READ_LIMIT]
                     events = [row for event in raw if (row := recipient_event(event, recipient_ids=recipient_ids, since=since)) is not None]
+                    stamps = [e.date for e in raw if isinstance(e, types.ChannelAdminLogEvent) and isinstance(e.date, datetime) and e.date.tzinfo]
                     response = {
                         'scope': scope, 'account': account_id,
                         'sender_id': sender_id, 'target_id': target_id,
                         'checked_at': datetime.now(timezone.utc).isoformat(),
                         'since': since.isoformat(), 'limit': READ_LIMIT,
                         'scanned_event_count': len(raw), 'events': events,
+                        'oldest_scanned_at': min(stamps).isoformat() if stamps else None,
                         'limited_window': True, 'read_only': True,
                         'invitation_requested': False, 'history_changed': False,
                         'eligibility_evaluated': False, 'membership_evaluated': False,
                         'notice': 'Это ограниченный исторический журнал выбранного сохранённого контроля. Отсутствие события не устанавливает причину и не доказывает текущее членство. Приглашения, настройки, очередь и лимиты не менялись.'}
                     if binding is None:
                         response.update(qa_job_id=130, recipient_id=QA_RECIPIENT)
+                    elif binding.get('kind') == 'saved_item':
+                        response.update(source_job_id=binding['job_id'], source_item_id=binding['item_id'],
+                            recipient_id=binding['user_id'], since_source='saved_attempt_at_minus_2_seconds')
                     else:
                         response.update(source_job_id=RUSSKIE_JOB, cohort_count=RUSSKIE_ITEM_COUNT,
                                         subject_count=len(recipient_ids),

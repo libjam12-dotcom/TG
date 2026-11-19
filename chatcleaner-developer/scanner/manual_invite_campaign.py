@@ -570,6 +570,16 @@ class ManualInviteCampaign(IsolatedInvite):
             proof.update(job_id=record['job_id'], frozen_items=self.items(record['job_id']))
             return self.public(record)
 
+    def stop_limit(self, record, counts, used):
+        cfg = record['config']
+        if cfg['success_goal'] and counts['added'] >= cfg['success_goal']:
+            return 'verified_goal_reached'
+        if record['attempts_claimed'] >= cfg['max_attempts']:
+            return 'campaign_attempt_cap_reached'
+        if used >= cfg['account_day_attempt_cap']:
+            return 'account_day_attempt_cap_reached'
+        return None
+
     def public(self, record):
         items = self.store.rows('SELECT id,user_id,user_name,state,attempted_at,finished_at,diagnosis,error FROM op_items WHERE job=? ORDER BY id', (record['job_id'],))
         counts = dict(total=len(items), attempts=sum(bool(i['attempted_at']) for i in items), added=0)
@@ -581,9 +591,21 @@ class ManualInviteCampaign(IsolatedInvite):
                 counts['added'] += 1
         row = self.ops.account_row(record['config']['account'])
         sender_error=self.sender_error(record['config'])
+        used = self.attempts_today(record['config']['telegram_id'])
+        resume_block = self.stop_limit(record, counts, used)
+        if sender_error:
+            resume_block = 'sender_restricted'
+        try:
+            sender = self.ops.readable_account(record['config']['account'])
+            if sender.me.id != record['config']['telegram_id']:
+                resume_block = 'sender_changed'
+        except HTTPException as exc:
+            resume_block = 'sender_cooldown' if exc.status_code == 429 else 'sender_unavailable'
+        if not resume_block and self.competing(record['config'], record['job_id']):
+            resume_block = 'other_outbound_active'
         return dict(**record, counts=counts, items=items, account=record['config']['account'], telegram_id=record['config']['telegram_id'],
-            account_attempts_today=self.attempts_today(record['config']['telegram_id']), outbound_paused=not bool(row['enabled']), sender_error=sender_error,
-            can_pause=record['state'] in ACTIVE, can_resume=not bool(sender_error) and record['state'] in ('paused', 'interrupted', 'stopped') and any(i['state'] == 'pending' for i in items),
+            account_attempts_today=used, outbound_paused=not bool(row['enabled']), sender_error=sender_error,
+            can_pause=record['state'] in ACTIVE, resume_block_reason=resume_block, can_resume=not resume_block and record['state'] in ('paused', 'interrupted', 'stopped') and any(i['state'] == 'pending' for i in items),
             invitation_requested=bool(counts['attempts']))
 
     async def status(self, job_id: int):
@@ -614,10 +636,10 @@ class ManualInviteCampaign(IsolatedInvite):
             self.require_unrestricted_outbound(record['config'])
             ctx = self.proof(spec.candidate_token, record['config'], spec.job_id)
             cfg = record['config']
-            if record['attempts_claimed'] >= cfg['max_attempts'] or ctx['used'] >= cfg['account_day_attempt_cap']:
-                raise fail(409, 'Лимит попыток кампании или отправителя за сутки исчерпан.')
-            if cfg['success_goal'] and self.public(record)['counts']['added'] >= cfg['success_goal']:
-                raise fail(409, 'Цель подтверждённых добавлений достигнута.')
+            limit = self.stop_limit(record, self.public(record)['counts'], ctx['used'])
+            if limit:
+                raise fail(409, 'Цель подтверждённых добавлений достигнута.' if limit == 'verified_goal_reached' else
+                    'Лимит попыток кампании или отправителя за сутки исчерпан.')
             job = self.job(spec.job_id)
             expected_marker = job['spec']['manual_invite_campaign']
             if expected_marker['config_digest'] != digest(cfg) or expected_marker['config'] != cfg:
@@ -715,10 +737,10 @@ class ManualInviteCampaign(IsolatedInvite):
             cfg = record['config']
             self.require_unrestricted_outbound(cfg)
             ctx = self.context(cfg, time.monotonic() + 25, spec.job_id)
-            if record['attempts_claimed'] >= cfg['max_attempts'] or ctx['used'] >= cfg['account_day_attempt_cap']:
-                raise fail(409, 'Лимит попыток кампании или отправителя за сутки исчерпан.')
-            if cfg['success_goal'] and self.public(record)['counts']['added'] >= cfg['success_goal']:
-                raise fail(409, 'Цель подтверждённых добавлений достигнута.')
+            limit = self.stop_limit(record, self.public(record)['counts'], ctx['used'])
+            if limit:
+                raise fail(409, 'Цель подтверждённых добавлений достигнута.' if limit == 'verified_goal_reached' else
+                    'Лимит попыток кампании или отправителя за сутки исчерпан.')
             if not any(i['state'] == 'pending' for i in self.items(spec.job_id)):
                 raise fail(409, 'В кампании нет ожидающих получателей.')
             try:
@@ -938,9 +960,7 @@ class ManualInviteCampaign(IsolatedInvite):
                         self.stop(record, 'paused', 'owner_pause')
                         return
                     counts = self.public(record)['counts']
-                    reason = ('campaign_attempt_cap_reached' if record['attempts_claimed'] >= cfg['max_attempts'] else
-                        'account_day_attempt_cap_reached' if self.attempts_today(cfg['telegram_id']) >= cfg['account_day_attempt_cap'] else
-                        'verified_goal_reached' if cfg['success_goal'] and counts['added'] >= cfg['success_goal'] else None)
+                    reason = self.stop_limit(record, counts, self.attempts_today(cfg['telegram_id']))
                     pending = next((i for i in ctx['items'] if i['state'] == 'pending'), None)
                     if reason or pending is None:
                         self.stop(record, 'paused' if reason == 'account_day_attempt_cap_reached' else 'completed', reason or 'all_selected_processed')

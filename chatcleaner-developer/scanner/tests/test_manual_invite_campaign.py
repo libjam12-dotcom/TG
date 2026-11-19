@@ -180,7 +180,7 @@ class ManualTests(unittest.IsolatedAsyncioTestCase):
     async def test_changed_cap_consent_or_group_invalidates_preview_and_no_write(self):
         cfg = self.config(2)
         preview = await self.ready(cfg)
-        for change in ({'max_attempts':1}, {'interval_seconds':2}, {'consent_note':'Другое подтверждение согласия'}, {'target_id':-1001749190526}):
+        for change in ({'max_attempts':1}, {'interval_seconds':2}, {'consent_note':'Другое подтверждение согласия'}, {'target_id':-1001234502002}):
             with self.assertRaises(HTTPException):
                 await self.manual.draft(DraftRequest(config=ManualConfig(**dict(cfg.model_dump(), **change)), candidate_token=preview['candidate_token'], request_key='changed-request-0001'))
         self.assertEqual(self.client.calls, [])
@@ -415,7 +415,7 @@ class ManualTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_explicit_secondary_selection_is_respected_and_primary_untouched(self):
         second = Client()
-        second.me = types.User(id=8492521342, username='secondary_chosen')
+        second.me = types.User(id=5550002001, username='secondary_chosen')
         second_runtime = SimpleNamespace(client=second, me=second.me, error=None)
         self.ops.accounts['selected-secondary'] = second_runtime
         with self.ops.store.db:
