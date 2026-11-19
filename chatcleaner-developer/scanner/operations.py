@@ -33,7 +33,6 @@ from operation_campaigns import OperationCampaigns
 from operation_folders import OperationFolders
 from operation_redirects import OperationRedirects
 from operation_budgets import OperationBudgets
-from invite_run_budget import InviteRunBudget
 from operation_workbench import OperationWorkbench, WorkbenchStopped
 from invite_progress import summarize_invites
 from operation_topics import DestinationTopic, OperationTopics, validate_topic_routes
@@ -170,21 +169,6 @@ class Control(BaseModel):
     confirmed: bool = False
     ack_single_request_key: str | None = Field(default=None,min_length=16,max_length=80)
 
-class InviteRunMember(BaseModel):
-    model_config = {'extra':'forbid'}
-    item_id: int = Field(gt=0,strict=True)
-    job_id: int = Field(gt=0,strict=True)
-    user_id: int = Field(gt=0,strict=True)
-
-class InviteRunGrant(BaseModel):
-    model_config = {'extra':'forbid'}
-    confirmed: Literal[True]
-    request_key: str = Field(min_length=16,max_length=80)
-    reason: str = Field(min_length=8,max_length=500)
-    expires_at: float
-    cohort_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
-    items: list[InviteRunMember] = Field(min_length=1,max_length=57)
-
 class SingleAttempt(BaseModel):
     model_config = {'extra':'forbid'}
     confirmed: Literal[True]
@@ -244,6 +228,8 @@ def safe_rpc_metadata(exc):
             allowed|=INVITE_TO_CHANNEL_EXTRA_RPC_ENUMS
         if candidate in allowed:
             message=candidate
+        elif type(request) is functions.channels.InviteToChannelRequest and getattr(exc,'code',None)==400:
+            message='BAD_REQUEST'
     code=getattr(exc,'code',None)
     return {'request_constructor':constructor,'exception_type':type(exc).__name__,
             'code':code if type(code) is int and -1000<=code<=1000 else None,'message':message}
@@ -496,10 +482,6 @@ class Operations:
         self.folders=OperationFolders(self);self.router.include_router(self.folders.router)
         self.redirects=OperationRedirects(self);self.router.include_router(self.redirects.router)
         self.budgets=OperationBudgets(self);self.router.include_router(self.budgets.router)
-        self.invite_runs=InviteRunBudget(self)
-        self.router.add_api_route('/invite-run-budgets/preview',self.invite_run_preview,methods=['GET'])
-        self.router.add_api_route('/invite-run-budgets/{request_key}',self.invite_run_status,methods=['GET'])
-        self.router.add_api_route('/invite-run-budgets',self.grant_invite_run_budget,methods=['POST'])
         self.workbench=OperationWorkbench(self);self.router.include_router(self.workbench.router)
         self.topics=OperationTopics(self);self.router.include_router(self.topics.router)
         self.qa_invite_adminlog=QaInviteAdminLog(self);self.router.include_router(self.qa_invite_adminlog.router)
@@ -569,25 +551,11 @@ class Operations:
         self.folders.initialize()
         self.redirects.initialize()
         self.budgets.initialize()
-        self.invite_runs.initialize()
         self.workbench.initialize()
         self.isolated_contact_batch.initialize()
         self.isolated_invite_campaign.initialize()
         self.manual_invite_campaign.initialize()
         self.spambot_check.initialize()
-
-    async def invite_run_preview(self):
-        async with self.lock:
-            return {k:v for k,v in self.invite_runs.preview().items() if k!='_envelope'}
-
-    async def invite_run_status(self,request_key:str):
-        async with self.lock:return self.invite_runs.status(request_key)
-
-    async def grant_invite_run_budget(self,spec:InviteRunGrant):
-        async with self.lock:
-            account=self.accounts.get('primary')
-            with self.store.db:
-                return self.invite_runs.grant(**spec.model_dump(),client=getattr(account,'client',None))
     def sync_primary(self):
         if not self.get_primary:return
         if 'primary' not in self.accounts:
@@ -982,7 +950,7 @@ class Operations:
             reason='Telegram больше не подтверждает сессию аккаунта. Подключите аккаунт заново.' if isinstance(exc,REVOKED) else 'Telegram отклонил проверку членства (PeerFloodError).'
             raise HTTPException(409,reason+' Исходящие приостановлены. Результат не подтверждён; приглашение не запускалось.') from None
         except TimeoutError:raise HTTPException(504,'Telegram долго проверяет членство. Приглашение не запускалось.') from None
-    async def prepare_contact(self,a,user,record,before_add=None,write_guard=None):
+    async def prepare_contact(self,a,user,record,before_add=None):
         """One optional contact write, followed by a fresh read; never messages/invites."""
         client=a.client;identity=a.me.id
         record.update(status='checking',request_sent=False,phone_privacy_exception_added=False,
@@ -995,7 +963,6 @@ class Operations:
             record.update(status='already_contact',checked_at=now());return
         if before_add:await before_add()
         same_sender()
-        if write_guard:await write_guard()
         record.update(status='requested',request_sent=True)
         try:
             result=await asyncio.wait_for(client(functions.contacts.AddContactRequest(
@@ -1625,7 +1592,6 @@ class Operations:
             if self.isolated_contact_batch.belongs(j):
                 self.isolated_contact_batch.control_job(j,spec)
                 return await self.detail(jid)
-            release_cap_hold=False
             gate=self.store.get('single_attempt_job_'+str(jid))
             if spec.action in ('start','resume','continue_pending') and isinstance(gate,dict) and gate.get('state')!='released':
                 raise HTTPException(409,'Одиночная проверка требует отдельного подтверждения «Продолжить остальных» после известного результата.')
@@ -1638,8 +1604,6 @@ class Operations:
                 if not status or not status['can_continue']:raise HTTPException(409,status.get('blocked_reason') if status else 'Одиночная проверка не найдена.')
                 a=self.online(j['account'])
                 if a.me.id!=j['telegram_id']:raise HTTPException(409,'Отправитель изменился.')
-                run_key=self.invite_runs.for_job(jid)
-                if run_key:self.invite_runs.validate_continue(run_key,jid,client=a.client)
                 if j['spec'].get('retry_invite'):
                     for item in j['items']:
                         if item['state']=='pending':self.validate_invite_retry(j,item)
@@ -1652,15 +1616,6 @@ class Operations:
                 if not pending:raise HTTPException(409,'В задании нет ожидающих участников.')
                 a=self.online(j['account'])
                 if a.me.id!=j['telegram_id']:raise HTTPException(409,'Отправитель изменился.')
-                run_key=self.invite_runs.for_job(jid)
-                if run_key:
-                    self.invite_runs.validate_continue(run_key,jid,client=a.client)
-                    midnight=(int(time.time())//86400+1)*86400
-                    # Only the panel's positively identified daily hold is released.
-                    # Account cooldowns and every unrelated schedule remain intact.
-                    if j['not_before']==midnight and pending[0].get('error')=='Дневной предел достигнут. Продолжение со следующего дня UTC.':
-                        release_cap_hold=True
-                        j['not_before']=0
                 if j['spec'].get('retry_invite'):
                     for item in pending:self.validate_invite_retry(j,item)
                 state='scheduled' if j['not_before']>time.time() else 'queued'
@@ -1669,8 +1624,6 @@ class Operations:
                 if j['state'] not in ('draft','paused'):raise HTTPException(409,'Задание уже запущено или завершено.')
                 a=self.online(j['account'])
                 if a.me.id!=j['telegram_id']:raise HTTPException(409,'Отправитель изменился.')
-                run_key=self.invite_runs.for_job(jid)
-                if run_key:self.invite_runs.validate_continue(run_key,jid,client=a.client)
                 if any(i['state'] in ('uncertain','sending') for i in j['items']):raise HTTPException(409,'Есть непроверенный результат. Не повторяйте операцию до проверки Telegram.')
                 if j['spec'].get('retry_invite'):
                     for item in j['items']:
@@ -1683,7 +1636,6 @@ class Operations:
                 if j['state'] in ('completed','partial','cancelled','failed'):raise HTTPException(409,'Задание завершено.')
                 state='cancelled'
             with self.store.db:
-                if release_cap_hold:self.store.db.execute('UPDATE op_jobs SET not_before=0 WHERE id=?',(jid,))
                 if spec.action=='continue_after_single':
                     gate.update(state='released',released_at=now());self.save_single_attempt(gate)
                 self.store.db.execute('UPDATE op_jobs SET state=?,updated=? WHERE id=?',(state,now(),jid))
@@ -1747,20 +1699,6 @@ class Operations:
         self.online(j['account'])
         result=publication_decision(self.store,j,item)
         if result:raise PostingPolicyStopped(result)
-
-    async def invite_run_before_write(self,j,item,client,phase='invite'):
-        key=self.invite_runs.for_job(j['id'])
-        if not key:return
-        async with self.lock:
-            try:
-                with self.store.db:
-                    claim=item.get('_run_claim')
-                    if not claim or claim['request_key']!=key:
-                        raise HTTPException(409,'Разовая попытка конечного допуска не заявлена.')
-                    self.invite_runs.before_write(key,item['id'],client=client,phase=phase)
-            except HTTPException:
-                with self.store.db:self.invite_runs.stop(key,'write_rejected')
-                raise
     async def execute(self,a,j,item):
         if IsolatedInviteCampaign.belongs(j) or ManualInviteCampaign.belongs(j):
             raise HTTPException(409,'Общий исполнитель не запускает изолированную кампанию.')
@@ -1845,8 +1783,7 @@ class Operations:
                 self.validate_single_claim(j,item)
                 self.workbench.guard(a,j,item,entity,user)
             try:
-                await self.prepare_contact(a,user,contact,contact_context,
-                    lambda:self.invite_run_before_write(j,item,client,'contact'))
+                await self.prepare_contact(a,user,contact,contact_context)
             except (errors.FloodWaitError,errors.PeerFloodError,*REVOKED):raise
             except HTTPException:raise
             except Exception as exc:
@@ -1873,7 +1810,6 @@ class Operations:
         self.validate_pilot_claim(j,item)
         self.validate_single_claim(j,item)
         self.workbench.guard(a,j,item,entity,user)
-        await self.invite_run_before_write(j,item,client)
         item['_invite_request_started']=True
         result=await a.client(functions.channels.InviteToChannelRequest(entity,[user]) if isinstance(entity,types.Channel) else functions.messages.AddChatUserRequest(entity.id,user,fwd_limit=0))
         evidence=invite_response_evidence(result,target_id=item['chat_id'],user_id=user.id,sender_id=j['telegram_id'])
@@ -1910,7 +1846,6 @@ class Operations:
     async def tick(self):
         self.sync_primary()
         async with self.lock:
-            with self.store.db:self.invite_runs.enforce_stops()
             self.expire_posting_windows()
             rows=self.store.rows("SELECT i.*,j.account FROM op_items i JOIN op_jobs j ON j.id=i.job JOIN op_accounts a ON a.id=j.account WHERE i.state='pending' AND j.state IN ('queued','scheduled') AND j.not_before<=? AND a.enabled=1 AND a.not_before<=? ORDER BY i.id",(time.time(),time.time()))
             rows=[r for r in rows if (a:=self.accounts.get(r['account'])) and a.me and a.client and a.client.is_connected()]
@@ -1959,12 +1894,7 @@ class Operations:
                 return
             count=self.account_daily_count(j['account'],now()[:10])
             effective_limit=pilot['account_daily_ceiling'] if pilot and pilot['active'] else self.normal_daily_limit(j)
-            run_key=self.invite_runs.for_job(j['id'])
-            if run_key:effective_limit=self.invite_runs.status(run_key)['account_daily_ceiling']
             if count>=effective_limit:
-                if run_key:
-                    with self.store.db:self.invite_runs.stop(run_key,'budget_exhausted')
-                    return
                 if isinstance(single,dict) and single.get('state')!='released':
                     self.interrupt_single_attempt(j,single);return
                 tomorrow=(int(time.time())//86400+1)*86400
@@ -1977,26 +1907,19 @@ class Operations:
                     self.store.get(f"single_attempt_item_{j['id']}_{item['id']}") is not None):
                     with self.store.db:self.store.db.execute("UPDATE op_jobs SET state='paused' WHERE id=?",(j['id'],))
                     return
-            try:
-                with self.store.db:
-                    if run_key:item['_run_claim']=self.invite_runs.claim(run_key,item['id'],client=a.client)
-                    if isinstance(single,dict) and single.get('state')=='armed':
-                        single.update(state='claimed',claimed_at=now());self.save_single_attempt(single)
-                        self.store.db.execute('INSERT INTO settings VALUES(?,?)',(f"single_attempt_item_{j['id']}_{item['id']}",json.dumps(single['request_key'])))
-                        item['_single_claim']=copy.deepcopy(single);item['_single_claim_client']=a.client
-                    if pilot and pilot['active']:
-                        record=self.store.get('invite_pilot_'+str(j['id']));record['attempts_used']+=1
-                        self.save_pilot(j['id'],record)
-                        item['_pilot_claim']={key:record[key] for key in ('job_id','account','telegram_id','chat_id','cohort_hash','utc_day',
-                                                                        'expires_at','account_daily_ceiling','additional_attempts','requested_at')}
-                        item['_pilot_claim']['claim_number']=record['attempts_used']
-                        item['_pilot_claim_client']=a.client
-                    self.store.db.execute("UPDATE op_items SET state='sending',attempted_at=? WHERE id=?",(now(),item['id']))
-            except HTTPException:
-                if not run_key:raise
-                # Persist the stop outside the rolled-back claim transaction.
-                with self.store.db:self.invite_runs.stop(run_key,'claim_rejected')
-                return
+            with self.store.db:
+                if isinstance(single,dict) and single.get('state')=='armed':
+                    single.update(state='claimed',claimed_at=now());self.save_single_attempt(single)
+                    self.store.db.execute('INSERT INTO settings VALUES(?,?)',(f"single_attempt_item_{j['id']}_{item['id']}",json.dumps(single['request_key'])))
+                    item['_single_claim']=copy.deepcopy(single);item['_single_claim_client']=a.client
+                if pilot and pilot['active']:
+                    record=self.store.get('invite_pilot_'+str(j['id']));record['attempts_used']+=1
+                    self.save_pilot(j['id'],record)
+                    item['_pilot_claim']={key:record[key] for key in ('job_id','account','telegram_id','chat_id','cohort_hash','utc_day',
+                                                                    'expires_at','account_daily_ceiling','additional_attempts','requested_at')}
+                    item['_pilot_claim']['claim_number']=record['attempts_used']
+                    item['_pilot_claim_client']=a.client
+                self.store.db.execute("UPDATE op_items SET state='sending',attempted_at=? WHERE id=?",(now(),item['id']))
         self.tracking.sync_jobs(j['id'])
         try:result=await asyncio.wait_for(self.execute(a,j,item),timeout=90)
         except (PostingPolicyStopped,WorkbenchStopped) as exc:result=exc.result
@@ -2039,7 +1962,6 @@ class Operations:
                 result=unconfirmed_invite(reason,item.get('_invite_response'),item.get('_invite_verification')) if item.get('_invite_request_started') else invite_preflight_failure(exc)
             else:result={'state':'uncertain','error':reason}
         if j['kind']=='invite':result.setdefault('diagnosis',{})['invitation_requested']=bool(item.get('_invite_request_started'))
-        if '_run_claim' in item:result.setdefault('diagnosis',{})['run_budget']=item['_run_claim']
         if '_contact_preparation' in item:
             result.setdefault('diagnosis',{})['contact_preparation']=item['_contact_preparation']
             result['diagnosis']['invitation_requested']=bool(item.get('_invite_request_started'))
@@ -2059,8 +1981,6 @@ class Operations:
                     invitation_requested=bool(item.get('_invite_request_started')))
                 self.save_single_attempt(single)
                 self.store.db.execute("UPDATE op_jobs SET state='paused' WHERE id=? AND state!='cancelled'",(j['id'],))
-        async with self.lock:
-            with self.store.db:self.invite_runs.enforce_stops()
         if not self.stop_pilot_goal(await self.detail(j['id'])):self.finish(j['id'])
     async def loop(self):
         while True:

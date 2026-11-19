@@ -17,7 +17,7 @@ from engine import now
 from isolated_invite import fail,isolated_admin_only,digest,REVOKED
 from operations import safe_error,safe_rpc_metadata
 
-BOT=178220800
+BOT=710000006
 PREFIX='official_spambot_check_request_'
 SENDER_PREFIX='official_spambot_check_sender_'
 SCOPE='official-spambot-one-start-v1'

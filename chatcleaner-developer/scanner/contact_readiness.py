@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from engine import now
 
 VERSION = 1
-AGGREGATORS = {'synthetic_job_feed'}
+AGGREGATORS = {'job_programming_apps_chatgpt_n8n'}
 MARKETPLACES = {'kwork.ru', 'kwork.com', 'fl.ru', 'freelance.ru', 'freelancehunt.com', 'upwork.com'}
 
 

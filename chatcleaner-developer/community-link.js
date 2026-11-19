@@ -1,0 +1,1 @@
+fetch('/api/scanner/marketing/community').then(r=>{if(!r.ok)return;const a=document.createElement('a');a.href='/community.html';a.textContent='СИНГУЛЯРНОСТЬ · личный проект';a.style.cssText='display:block;padding:14px;color:#087b8d';(document.querySelector('aside')||document.body).append(a)}).catch(()=>{});

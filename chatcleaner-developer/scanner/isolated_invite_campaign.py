@@ -560,7 +560,7 @@ class IsolatedInviteCampaign(IsolatedInvite):
                 record['job_id'] = cur.lastrowid
                 for user in candidates:
                     self.store.db.execute('INSERT INTO op_items(job,chat_id,chat_title,chat_username,user_id,user_name,state,random_ids,user_access_hash) VALUES(?,?,?,?,?,?,?,?,?)',
-                        (record['job_id'], TARGET, 'ТЕСТОВОЕ СООБЩЕСТВО', 'demo_identity_6', user['user_id'], user['username'], 'pending', '[]', user['access_hash']))
+                        (record['job_id'], TARGET, 'РУССКИЕ В ДУБАЕ', 'demo_identity_6', user['user_id'], user['username'], 'pending', '[]', user['access_hash']))
                 for key in (self.day_key(ctx['day'], spec.mode), REQUEST_PREFIX + spec.request_key):
                     self.store.db.execute('INSERT INTO settings(key,value) VALUES(?,?)', (key, json.dumps(record, ensure_ascii=False)))
             run_deadline = time.monotonic() + expires - wall

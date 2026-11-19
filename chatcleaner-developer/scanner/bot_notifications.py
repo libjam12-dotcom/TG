@@ -97,7 +97,7 @@ class BotNotifications:
             try:
                 me=await self.call(token,'getMe',{})
                 if not me.get('is_bot'):raise HTTPException(400,'Токен не относится к боту.')
-                if me.get('username','').lower()=='developmentdemo_bot':raise HTTPException(400,'Создайте отдельного бота уведомлений, чтобы настройки антиспам-бота оставались отдельными.')
+                if me.get('username','').lower()=='chatcleanerdubai_bot':raise HTTPException(400,'Создайте отдельного бота уведомлений, чтобы настройки антиспам-бота оставались отдельными.')
                 chat=await self.call(token,'getChat',{'chat_id':ref})
                 if chat.get('type') not in ('group','supergroup') or type(chat.get('id')) is not int or chat['id']>=0:raise HTTPException(400,'Получателем должна быть группа или супергруппа.')
                 if self.store.db.execute('SELECT 1 FROM sources WHERE id=? AND enabled=1',(chat['id'],)).fetchone():raise HTTPException(400,'Группа уведомлений не должна быть активным источником лидсканера.')

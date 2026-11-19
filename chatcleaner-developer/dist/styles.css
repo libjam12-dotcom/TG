@@ -59,6 +59,3 @@ dialog{border:1px solid var(--line);border-radius:12px;padding:0;width:min(540px
   #marketing-scanner .ls-status .badge,#marketing-scanner .ls-status>span{white-space:normal;overflow-wrap:anywhere;max-width:100%}
   #owner-conversation-inbox .cm-automation{overflow-wrap:anywhere}
 }
-
-/* Empty feedback areas must not reserve a coloured panel. */
-#op-notice:empty,#audience-message:empty{display:none} [hidden].notice{display:none!important}

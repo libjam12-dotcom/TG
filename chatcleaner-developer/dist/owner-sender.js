@@ -5,7 +5,7 @@ window.OwnerSenderPanel=(()=>{
  const root=()=>document.querySelector('#owner-sender');
  const field=(label,name,type,attrs='')=>`<label class="ls-field">${h(label)}<input name="${name}" type="${type}" required ${attrs}></label>`;
  const form=(name,body,label)=>`<form data-sender-form="${name}">${body}<button class="button" ${busy?'disabled':''}>${label}</button></form>`;
- const phoneForm=()=>form('code',field('Номер аккаунта @demo_identity_3','phone','tel','placeholder="+79068128175" pattern="\\+[0-9]{10,15}" autocomplete="tel"'),'Получить код Telegram');
+ const phoneForm=()=>form('code',field('Номер аккаунта @demo_identity_3','phone','tel','placeholder="+79991234567" pattern="\\+[0-9]{10,15}" autocomplete="tel"'),'Получить код Telegram');
  const qrButton=()=>`<button class="button secondary" data-sender-qr ${busy?'disabled':''}>Войти по QR без кода</button>`;
  async function api(path='',body){const r=await fetch('/api/scanner/marketing/sender'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Scanner-Request':'1'},signal:AbortSignal.timeout(45000),...(body===undefined?{}:{body:JSON.stringify(body)})});let data;try{data=await r.json();}catch{throw Error('Сервис не ответил. Повторите проверку подключения.');}if(!r.ok)throw Error(data.detail||'Не удалось выполнить действие.');return data;}
  function view(){return '<section id="owner-sender" class="panel ls-section"><h2>Отправитель · @demo_identity_3</h2><p>Проверяем личное подключение…</p></section>';}

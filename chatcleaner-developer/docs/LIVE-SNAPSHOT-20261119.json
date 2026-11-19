@@ -1,0 +1,501 @@
+{
+  "date": "2026-11-19",
+  "source": "read-only export of deployed code; no runtime data",
+  "files": [
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/__init__.py",
+      "source_sha256": "e42351ce5e285afc7eb49cd65dda764fa3be5c4f20b2c88ed7bbd5138004c94b",
+      "sanitized_sha256": "e42351ce5e285afc7eb49cd65dda764fa3be5c4f20b2c88ed7bbd5138004c94b"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/ai/__init__.py",
+      "source_sha256": "366dbd014949bf9e2fcdfdfd37aa90463b82820db2f96578a7df7199d065e26a",
+      "sanitized_sha256": "366dbd014949bf9e2fcdfdfd37aa90463b82820db2f96578a7df7199d065e26a"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/config.py",
+      "source_sha256": "895836dc4bd6940eb9eadff553e3f729369eeafffeb491c8546298324ef2f3aa",
+      "sanitized_sha256": "895836dc4bd6940eb9eadff553e3f729369eeafffeb491c8546298324ef2f3aa"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/domain/__init__.py",
+      "source_sha256": "544040bddb44b099ba31ca66f9d240cb79dcff6316651c4e3b4f304afd57d3e8",
+      "sanitized_sha256": "544040bddb44b099ba31ca66f9d240cb79dcff6316651c4e3b4f304afd57d3e8"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/domain/models.py",
+      "source_sha256": "50a73df9f8ed5e8003bd658c3815b6b6485871cccd2afcf877e2dad2c75f7699",
+      "sanitized_sha256": "50a73df9f8ed5e8003bd658c3815b6b6485871cccd2afcf877e2dad2c75f7699"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/moderation/__init__.py",
+      "source_sha256": "035d917608ebc76e9239f9441e9d5c75d2148e8c15460ee1eeaa320ae8540939",
+      "sanitized_sha256": "035d917608ebc76e9239f9441e9d5c75d2148e8c15460ee1eeaa320ae8540939"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/moderation/advertising.py",
+      "source_sha256": "cdba8d99bbb51ad99fea3107f7658d974a2507f0f8544781ba5549393b0d851f",
+      "sanitized_sha256": "cdba8d99bbb51ad99fea3107f7658d974a2507f0f8544781ba5549393b0d851f"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/moderation/engine.py",
+      "source_sha256": "866418bd42c030ebe8509a1faed648cf3f21ef26d55b88c73702025f82a4a2a5",
+      "sanitized_sha256": "866418bd42c030ebe8509a1faed648cf3f21ef26d55b88c73702025f82a4a2a5"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/moderation/normalize.py",
+      "source_sha256": "83c5ab723b5741de4f2385fe567ae91a72f5c811c12add4286c23b1f1df61942",
+      "sanitized_sha256": "83c5ab723b5741de4f2385fe567ae91a72f5c811c12add4286c23b1f1df61942"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/storage/__init__.py",
+      "source_sha256": "c7b3eb3e9c51ab8c38a0c7796f000a0c289685fc17dce18507d607d1fdac5d46",
+      "sanitized_sha256": "c7b3eb3e9c51ab8c38a0c7796f000a0c289685fc17dce18507d607d1fdac5d46"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/storage/repositories.py",
+      "source_sha256": "1be03c7e9533f3d7f1282f5f72ce257b16de5a8cde17722c2a93fed3a07131e7",
+      "sanitized_sha256": "1be03c7e9533f3d7f1282f5f72ce257b16de5a8cde17722c2a93fed3a07131e7"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/storage/schema.sql",
+      "source_sha256": "18eef9bddc5c951432ba643030d4e3aaa56f19921ac104231d2d7de1735d8d3a",
+      "sanitized_sha256": "18eef9bddc5c951432ba643030d4e3aaa56f19921ac104231d2d7de1735d8d3a"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/telegram/__init__.py",
+      "source_sha256": "895880b65f60595e10d3953e5950e98963e820da7efdfc5f661f86afbb719c0a",
+      "sanitized_sha256": "895880b65f60595e10d3953e5950e98963e820da7efdfc5f661f86afbb719c0a"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/telegram/actions.py",
+      "source_sha256": "3d31f5f5fb08065b30aba7e1ea5080d73fcdb04ef366800c376cbc6c06d02cad",
+      "sanitized_sha256": "3d31f5f5fb08065b30aba7e1ea5080d73fcdb04ef366800c376cbc6c06d02cad"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/telegram/app.py",
+      "source_sha256": "e027f6c31378c0c382a8b95c674fbed7f8445eedc7316dad963bb292c0ba6e09",
+      "sanitized_sha256": "e027f6c31378c0c382a8b95c674fbed7f8445eedc7316dad963bb292c0ba6e09"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/telegram/handlers.py",
+      "source_sha256": "2f6559780535cd5ad4982706bd1fd4864491495a1918f3ad1f599752417e4056",
+      "sanitized_sha256": "fe9fd268539b531eccfd3405c6822a1dc2de891cac4421d56a76e3d4e2f698db"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/telegram/menus.py",
+      "source_sha256": "7bb4d84d7342c7ca184a1e137d8ac46c2b7a74bc70656f5276ff7585be05ae29",
+      "sanitized_sha256": "7bb4d84d7342c7ca184a1e137d8ac46c2b7a74bc70656f5276ff7585be05ae29"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/web/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "chatcleaner-developer/antispam/src/antispam/web/app.py",
+      "source_sha256": "aaef12968fe2440e68cccab67b99baac55d799d8b2c06920a0ed02209d91d8ef",
+      "sanitized_sha256": "5e7258fd3e1a436aa4072699d97feb39db488478a6449593291776c3784de910"
+    },
+    {
+      "file": "chatcleaner-developer/auth/server.py",
+      "source_sha256": "6b92c964062d0d70898201622f7b2122bd773c29cc66b0c82a258229d10fa307",
+      "sanitized_sha256": "6b92c964062d0d70898201622f7b2122bd773c29cc66b0c82a258229d10fa307"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/account_import.py",
+      "source_sha256": "97dbc84df6e51c2107ef35a13c1aad6b83812713eb94573ecc47ce721c38c42f",
+      "sanitized_sha256": "9bb94f095ee8c50d19012bce3599f0fb53331c593b5750542ce3c0ee929bede4"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/app.py",
+      "source_sha256": "ceb3cee373bd84b71646d31744bcb0f0d550a39f10ae853dcdd0e696739aa1aa",
+      "sanitized_sha256": "dc5e03a37fbb6ee4c232627fbcfc2854a44e46a999fc4f17926aaf0596aa6bb7"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/audience.py",
+      "source_sha256": "8cae05e20fc55a61d2b7676724ddd75e564b7b3b5adc4812684928695f1161cf",
+      "sanitized_sha256": "8cae05e20fc55a61d2b7676724ddd75e564b7b3b5adc4812684928695f1161cf"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/bot_notifications.py",
+      "source_sha256": "7b5d106f2a7822a0a17399d615c6b66d9c4d2a44c66dcbe9a20a156598422d5e",
+      "sanitized_sha256": "b947dc1827240055afbfa55baf26d84a08e5232cccefbd55a8188008a25590a3"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/client_contacts.py",
+      "source_sha256": "0f22785d93befca0123a8446f9ac65cb74e40294332082bf214da8f431e1ec89",
+      "sanitized_sha256": "0f22785d93befca0123a8446f9ac65cb74e40294332082bf214da8f431e1ec89"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/contact_readiness.py",
+      "source_sha256": "7769cdfd9150a1f0e47141ad4282b2a2dc65ca4906b3c1cf1e999911e472d89c",
+      "sanitized_sha256": "7769cdfd9150a1f0e47141ad4282b2a2dc65ca4906b3c1cf1e999911e472d89c"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/conversations.py",
+      "source_sha256": "96ba8d277df3570861fb21b7e419fc4bc21754f97c4eead552244cbf29bf394a",
+      "sanitized_sha256": "96ba8d277df3570861fb21b7e419fc4bc21754f97c4eead552244cbf29bf394a"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/directory.py",
+      "source_sha256": "749e0f87213d458323dde7242b80bad44d70561db903d742a516395415af91d1",
+      "sanitized_sha256": "749e0f87213d458323dde7242b80bad44d70561db903d742a516395415af91d1"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/dj_topic.py",
+      "source_sha256": "7231f9ffa487bd1d3de99695089ac1fce749df25a1b42ac5d538e9be60e8ef2e",
+      "sanitized_sha256": "7231f9ffa487bd1d3de99695089ac1fce749df25a1b42ac5d538e9be60e8ef2e"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/engine.py",
+      "source_sha256": "2b4c024e1af95449bcfd9bd3cad79ea55cdde9767193db85cd5c42b66eed1adb",
+      "sanitized_sha256": "2b4c024e1af95449bcfd9bd3cad79ea55cdde9767193db85cd5c42b66eed1adb"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/history.py",
+      "source_sha256": "310c4576b74d05871cb7c6719972351a361106772b0cfb1bf4bc6a4ebb13674f",
+      "sanitized_sha256": "310c4576b74d05871cb7c6719972351a361106772b0cfb1bf4bc6a4ebb13674f"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/invite_progress.py",
+      "source_sha256": "2701575d2d64885a01b0573a6a5070ed899192c0b9d18f523e157d497dda2aad",
+      "sanitized_sha256": "2701575d2d64885a01b0573a6a5070ed899192c0b9d18f523e157d497dda2aad"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/isolated_contact_batch.py",
+      "source_sha256": "99322a3879b61ed190cf1e9b663c2fca11b6fe72fff95eb9da39f9ac07c59f65",
+      "sanitized_sha256": "9e7ff51cde745c98b5d24d80549d0d7ddc3d38f5b3cc2f772583e222cf3c9bbc"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/isolated_invite.py",
+      "source_sha256": "177f7e792ed97f76a27d007cea019773c528f83f8f854f52bbf2ddc78b8f6d1d",
+      "sanitized_sha256": "8f6dd24240002f2256d7e8b58ef58be9516f215793b604c76840273301e30fcc"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/isolated_invite_campaign.py",
+      "source_sha256": "d04697a143ea9efa5602597d869b74daeb5e499097c39b990b3c2bcdbe21b8ca",
+      "sanitized_sha256": "6af927a9759e44f615624f1dfec431db50864e52a5d172c7f9518dc3a3b3a191"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/manual_invite_campaign.py",
+      "source_sha256": "c3bdc3f5546105919bd15b6c787f70f127b6ee1430fe12b0ee1287c7584243e6",
+      "sanitized_sha256": "c3bdc3f5546105919bd15b6c787f70f127b6ee1430fe12b0ee1287c7584243e6"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/marketing.py",
+      "source_sha256": "33ec8abbca5bd1a999b5b718cc02485d0276ddd82b4fbcb2121f5b000fc91eea",
+      "sanitized_sha256": "33ec8abbca5bd1a999b5b718cc02485d0276ddd82b4fbcb2121f5b000fc91eea"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/marketing_topics.py",
+      "source_sha256": "d86f608ef6ac3da66d858371b248b285e6ed647ff26a8dc3431ed1bd940f01a8",
+      "sanitized_sha256": "03579df6bb07109c30d4227c0096a82694f6f9ec0b1a9ec3f4f641e93678aa88"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_budgets.py",
+      "source_sha256": "eb85c306d999ca5b9780ecfb0f3363a1641338e41807e82707df1c4e9de2464f",
+      "sanitized_sha256": "eb85c306d999ca5b9780ecfb0f3363a1641338e41807e82707df1c4e9de2464f"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_campaigns.py",
+      "source_sha256": "78ed3396ff2bfa8fc7444c83d4fb112a293d5869c6165b3cf0bf43058e347a2b",
+      "sanitized_sha256": "78ed3396ff2bfa8fc7444c83d4fb112a293d5869c6165b3cf0bf43058e347a2b"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_folders.py",
+      "source_sha256": "40aa43be17f34ac0edf5578e98e34fc7b3bf42b57f84d2e24e2c13858845532d",
+      "sanitized_sha256": "40aa43be17f34ac0edf5578e98e34fc7b3bf42b57f84d2e24e2c13858845532d"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_redirects.py",
+      "source_sha256": "8049ea44934f29b870d15a13178094f0e2d2f8fd6601b77a1140368043a72ad4",
+      "sanitized_sha256": "8049ea44934f29b870d15a13178094f0e2d2f8fd6601b77a1140368043a72ad4"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_test_chat.py",
+      "source_sha256": "98a8e37fdad646162279c0e2d06d249332497f7baaabe1e480cbc2938d470b67",
+      "sanitized_sha256": "98a8e37fdad646162279c0e2d06d249332497f7baaabe1e480cbc2938d470b67"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_topics.py",
+      "source_sha256": "0fbac69d117611435dae0d8062067281c4858969b8d90fb3dc7eb5e5965bd31b",
+      "sanitized_sha256": "0fbac69d117611435dae0d8062067281c4858969b8d90fb3dc7eb5e5965bd31b"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_tracking.py",
+      "source_sha256": "c67f67efbae7b10cc7ff855b076561b2882336263bdf01dd500eeb949bc7fa0b",
+      "sanitized_sha256": "c67f67efbae7b10cc7ff855b076561b2882336263bdf01dd500eeb949bc7fa0b"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operation_workbench.py",
+      "source_sha256": "0010e0c9ea925b1b6865d5cf1898f29454f04e68add9d4e1f8245fa55de3e8df",
+      "sanitized_sha256": "0010e0c9ea925b1b6865d5cf1898f29454f04e68add9d4e1f8245fa55de3e8df"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/operations.py",
+      "source_sha256": "d7db9b4c53e5f3ce9ae5ce16ffa4bf6cb6afbe675767cc0774ca8f41f5e53bc0",
+      "sanitized_sha256": "d7db9b4c53e5f3ce9ae5ce16ffa4bf6cb6afbe675767cc0774ca8f41f5e53bc0"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/owned_target_invite.py",
+      "source_sha256": "f996384219397d64efc1e5927a544ceb078dc968d92374fc398b9fd9a3c5ff90",
+      "sanitized_sha256": "d3ccab172006d11a2ba462f990ac56d86c039dbb966dcd442f0c4041cf800a29"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/owner_ai.py",
+      "source_sha256": "9be5aa46bc417af945670bcac81a48caacc8bf7557d9ae4cf7544bd4b0082ca0",
+      "sanitized_sha256": "27d3cc410723ef1d7f1aa1cb3722fea77c4858b107c11b0cb3899d2a3b60f391"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/owner_prospects.py",
+      "source_sha256": "552112336a8fac3d5d25ea11213771dfeec647f12d54fed497f0b7d5abf8c5af",
+      "sanitized_sha256": "552112336a8fac3d5d25ea11213771dfeec647f12d54fed497f0b7d5abf8c5af"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/owner_sender.py",
+      "source_sha256": "98b3987e619913c012abe0191c4197f93874cc5a9c3ee629600a7ed23922073d",
+      "sanitized_sha256": "b89d0fb437ee644ddfea9aaf7f22a243463cc479f9efd7cd13c43e17e3ebcd72"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/posting_policy.py",
+      "source_sha256": "842980ba0a19c03b635a9665f9bec090c5e9d297acdaa8109281a3d04415c5d4",
+      "sanitized_sha256": "842980ba0a19c03b635a9665f9bec090c5e9d297acdaa8109281a3d04415c5d4"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/publisher.py",
+      "source_sha256": "6addc03ba4f18bd001dddf2008386aaebb175c24b6d8da110d8f33f78edd63ba",
+      "sanitized_sha256": "6addc03ba4f18bd001dddf2008386aaebb175c24b6d8da110d8f33f78edd63ba"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/qa_invite_adminlog.py",
+      "source_sha256": "6f7158cc29a9e42f9f4ebecf4c72668d02908c08412d5c833d30fa8cd02c741d",
+      "sanitized_sha256": "2b9f04f0b2ff1bc7854f3e1b92f2192b458f1431d04d600607c52f5564d4f2c9"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/qualification.py",
+      "source_sha256": "e50bfb4d801e14574caebd8e2629f42dbcfdc06562368291f634cfae93c03456",
+      "sanitized_sha256": "e50bfb4d801e14574caebd8e2629f42dbcfdc06562368291f634cfae93c03456"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/requirements.txt",
+      "source_sha256": "06a0978bfde8bbd5b410f632149f6235df13e82557f4c4f9cc93e73e779aede7",
+      "sanitized_sha256": "06a0978bfde8bbd5b410f632149f6235df13e82557f4c4f9cc93e73e779aede7"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/signm_intent.py",
+      "source_sha256": "57b32fa01f1d8fed9ae7cb5c68b2b89fb39f3f40a5a9aa0db7a662bfb781a652",
+      "sanitized_sha256": "57b32fa01f1d8fed9ae7cb5c68b2b89fb39f3f40a5a9aa0db7a662bfb781a652"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/signm_pipeline.py",
+      "source_sha256": "c208251e742865f0d3b4354f4e80723361c0cd20a1d49ca2540815cd6a2596cc",
+      "sanitized_sha256": "0b095a352c127315429e53373d3d61482ff4b144410e8074c08afdc8c4dc4d34"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/sound_topic.py",
+      "source_sha256": "e37410da71a5f76cfba7c217a688df14c7e63b30e63dea6b22ba2835e1dd7ba8",
+      "sanitized_sha256": "e37410da71a5f76cfba7c217a688df14c7e63b30e63dea6b22ba2835e1dd7ba8"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/source_folders.py",
+      "source_sha256": "e03f7f220a02d24654315b45a689a676fa59d03c30c3df673abeaacce3ea8f48",
+      "sanitized_sha256": "e03f7f220a02d24654315b45a689a676fa59d03c30c3df673abeaacce3ea8f48"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/spambot_check.py",
+      "source_sha256": "4b7fc76fb67ecfadcf01d8b363ebb4a15788e55a0dec1194f45778ae338aa145",
+      "sanitized_sha256": "d0102f37576d4c44dcf8f8ec2f2a353d7a5e561ea925ad0e4b4657311fe8113a"
+    },
+    {
+      "file": "chatcleaner-developer/scanner/topics.py",
+      "source_sha256": "a4c53f1540ac5102ca4ac299ec419a355033fa5db93970d0e6912979201925e8",
+      "sanitized_sha256": "a4c53f1540ac5102ca4ac299ec419a355033fa5db93970d0e6912979201925e8"
+    },
+    {
+      "file": "chatcleaner-developer/antispam.js",
+      "source_sha256": "1fa9689adf7bc2ef9c0197924dd42d06b9ad3701946ffaa8f6145429c53ba61c",
+      "sanitized_sha256": "1fa9689adf7bc2ef9c0197924dd42d06b9ad3701946ffaa8f6145429c53ba61c"
+    },
+    {
+      "file": "chatcleaner-developer/app.js",
+      "source_sha256": "4a2209367fc162893b99708bb4f4ac547929aacee3bb5b0455990a42c56e6641",
+      "sanitized_sha256": "f551f7785d08df8fcc934e9be627b8b2ef8ec45a22506f4413f589d57a7070b6"
+    },
+    {
+      "file": "chatcleaner-developer/audience.css",
+      "source_sha256": "50cabda256ab56fc288df1035c518c1a48227227b2e3330bc2f09c96cc455911",
+      "sanitized_sha256": "50cabda256ab56fc288df1035c518c1a48227227b2e3330bc2f09c96cc455911"
+    },
+    {
+      "file": "chatcleaner-developer/audience.js",
+      "source_sha256": "5e60fdb5a93f1484ab2d6b5fd3f1e904e69f811c490cda05d9aa480664ff559f",
+      "sanitized_sha256": "5e60fdb5a93f1484ab2d6b5fd3f1e904e69f811c490cda05d9aa480664ff559f"
+    },
+    {
+      "file": "chatcleaner-developer/bot-notifications.js",
+      "source_sha256": "75b8950133bc7dcc84955d14bd522df7eab86e6f1a21f4b52eb588e505676890",
+      "sanitized_sha256": "75b8950133bc7dcc84955d14bd522df7eab86e6f1a21f4b52eb588e505676890"
+    },
+    {
+      "file": "chatcleaner-developer/community-link-loader.js",
+      "source_sha256": "b11a2e3dfa4d87c884df49d27c8f779e2b562e7ad57476c5b3a6d62529f99f69",
+      "sanitized_sha256": "b11a2e3dfa4d87c884df49d27c8f779e2b562e7ad57476c5b3a6d62529f99f69"
+    },
+    {
+      "file": "chatcleaner-developer/community-link.js",
+      "source_sha256": "fd7c980d5fb7c0c60a3af8a5b6d49afb46b0df38a5170b2b379ce0696efeb5da",
+      "sanitized_sha256": "fd7c980d5fb7c0c60a3af8a5b6d49afb46b0df38a5170b2b379ce0696efeb5da"
+    },
+    {
+      "file": "chatcleaner-developer/community.html",
+      "source_sha256": "9a5c4a29fb78783cd63a00626fa6de2eb7394399321dae2eb028a4438b7d81af",
+      "sanitized_sha256": "e81f9e68217fe3a2e23999a4a8b08e3140082e8f2bf888245e99e27564508642"
+    },
+    {
+      "file": "chatcleaner-developer/community.js",
+      "source_sha256": "94a308b731aec2866e8eee01fd9211f3265a8b8017ece3020e0c1bb2b9e9984c",
+      "sanitized_sha256": "7ce5a75edb61c281d8c154dfd345beb722988f1c67f37b509c9f33683864155e"
+    },
+    {
+      "file": "chatcleaner-developer/conversations.js",
+      "source_sha256": "286963c4bf87f729ae04b7a115ed1dd19f3cb28aed5c61e6cc19aa73d6c1037f",
+      "sanitized_sha256": "286963c4bf87f729ae04b7a115ed1dd19f3cb28aed5c61e6cc19aa73d6c1037f"
+    },
+    {
+      "file": "chatcleaner-developer/index.html",
+      "source_sha256": "20b217556d34e56c480a8935e63a7f90428baeb529ac0f73b7b627360412975c",
+      "sanitized_sha256": "20b217556d34e56c480a8935e63a7f90428baeb529ac0f73b7b627360412975c"
+    },
+    {
+      "file": "chatcleaner-developer/isolated-contact-batch.js",
+      "source_sha256": "ed7683ec4bace3799aa1bfc8dc180d92233bcc34d30772ea2ac61b19aff95135",
+      "sanitized_sha256": "9487b2bd4a54a2d60023314499a6e83fc313568653413d9daf11a94acaa53915"
+    },
+    {
+      "file": "chatcleaner-developer/isolated-invite-campaign.js",
+      "source_sha256": "72046223ef93f87ad5ee4ac5414344a92ed9af9af1ebb8c884f58f29d967fadb",
+      "sanitized_sha256": "949ff7e79748b9e0b6c0d7cd2fecc22b6df289dcd3b064a2e0ed8fd73a6e5992"
+    },
+    {
+      "file": "chatcleaner-developer/manual-invite-campaign.js",
+      "source_sha256": "8c6ffc3c5fbe0838bf7e273184b4be427fc0853024c6d6d54cd20da85509a700",
+      "sanitized_sha256": "8c6ffc3c5fbe0838bf7e273184b4be427fc0853024c6d6d54cd20da85509a700"
+    },
+    {
+      "file": "chatcleaner-developer/marketing.js",
+      "source_sha256": "74757777557d1ba090a4f3e2cefc64b02c514495e71e5a5507229f4d76c545ad",
+      "sanitized_sha256": "c3caf1ceaa3d928b71ffcddea04c120fd718beeadbd51fc1bdd4bbe402fda76f"
+    },
+    {
+      "file": "chatcleaner-developer/operation-budgets.js",
+      "source_sha256": "b28af736b6484dd52c141353d7a973e484a4f47132965e21f61ec7681e53fc74",
+      "sanitized_sha256": "b28af736b6484dd52c141353d7a973e484a4f47132965e21f61ec7681e53fc74"
+    },
+    {
+      "file": "chatcleaner-developer/operation-campaigns.js",
+      "source_sha256": "3f8c815a28d589a37acc08a9a36a694b4569538a866a2ad79e8209c8a3a75038",
+      "sanitized_sha256": "3f8c815a28d589a37acc08a9a36a694b4569538a866a2ad79e8209c8a3a75038"
+    },
+    {
+      "file": "chatcleaner-developer/operation-preview.css",
+      "source_sha256": "f8900e2992aedc91d9570434f0af19f98050396bfa09ec217daaafc619903ca6",
+      "sanitized_sha256": "f8900e2992aedc91d9570434f0af19f98050396bfa09ec217daaafc619903ca6"
+    },
+    {
+      "file": "chatcleaner-developer/operation-preview.js",
+      "source_sha256": "5d5c120e0a9cfb624662a270951219e929a71ac55facdb78dec416e885f8881a",
+      "sanitized_sha256": "5d5c120e0a9cfb624662a270951219e929a71ac55facdb78dec416e885f8881a"
+    },
+    {
+      "file": "chatcleaner-developer/operation-topics.js",
+      "source_sha256": "69f344749366b31bab67afe9909123eeb036e441d39d2c901213292d63b8e6bd",
+      "sanitized_sha256": "69f344749366b31bab67afe9909123eeb036e441d39d2c901213292d63b8e6bd"
+    },
+    {
+      "file": "chatcleaner-developer/operation-tracking.js",
+      "source_sha256": "a647ae708a771d197662ba3665a2a3dc885034ab20fb3623bc60eafd72d920cd",
+      "sanitized_sha256": "a647ae708a771d197662ba3665a2a3dc885034ab20fb3623bc60eafd72d920cd"
+    },
+    {
+      "file": "chatcleaner-developer/operation-workbench.css",
+      "source_sha256": "eaf519e7c2725fce0b29c75ad1aa4d8bb490b2cf198ba288cee71e2ab4052ab2",
+      "sanitized_sha256": "eaf519e7c2725fce0b29c75ad1aa4d8bb490b2cf198ba288cee71e2ab4052ab2"
+    },
+    {
+      "file": "chatcleaner-developer/operation-workbench.js",
+      "source_sha256": "f4a5cada6ae4b60cc42bd6ef152bd23d9b6409ea51029798a3291517df2c617d",
+      "sanitized_sha256": "f4a5cada6ae4b60cc42bd6ef152bd23d9b6409ea51029798a3291517df2c617d"
+    },
+    {
+      "file": "chatcleaner-developer/operations.js",
+      "source_sha256": "5309969d90c50566cd9883432d8da9a51005514cd611aae1cd1aa9856b66ed20",
+      "sanitized_sha256": "5309969d90c50566cd9883432d8da9a51005514cd611aae1cd1aa9856b66ed20"
+    },
+    {
+      "file": "chatcleaner-developer/owner-conversations.js",
+      "source_sha256": "29cd97a0876396051a012fee3ad48292b8a8808a6fe96b651f5f1e1b9783ec3a",
+      "sanitized_sha256": "29cd97a0876396051a012fee3ad48292b8a8808a6fe96b651f5f1e1b9783ec3a"
+    },
+    {
+      "file": "chatcleaner-developer/owner-sender.js",
+      "source_sha256": "62acce3b82fc19e80fe2005f6456a587fb3ad8c62db4e79c543a788af8276939",
+      "sanitized_sha256": "b547f40a72be4a0a858d48445ab1c189c2d0d123c151ec093614a364d4515aa6"
+    },
+    {
+      "file": "chatcleaner-developer/parser.js",
+      "source_sha256": "9b8377e60ed7853e62107a1b956553888f5ce4ac9a5b9dbb84d386d0827515b0",
+      "sanitized_sha256": "9b8377e60ed7853e62107a1b956553888f5ce4ac9a5b9dbb84d386d0827515b0"
+    },
+    {
+      "file": "chatcleaner-developer/participants.css",
+      "source_sha256": "276f08945d53a89ae71bb26a853aebee83e170346befad279e43210e9ddd8b4e",
+      "sanitized_sha256": "276f08945d53a89ae71bb26a853aebee83e170346befad279e43210e9ddd8b4e"
+    },
+    {
+      "file": "chatcleaner-developer/participants.js",
+      "source_sha256": "aa6c52488281144a87ed0f94b6e937a06c0aa274de5eb7d177611cbca3c5c506",
+      "sanitized_sha256": "aa6c52488281144a87ed0f94b6e937a06c0aa274de5eb7d177611cbca3c5c506"
+    },
+    {
+      "file": "chatcleaner-developer/publisher.js",
+      "source_sha256": "c5c56ac70ce2dae2ef64e85a39975363f3e60e518d2b85af80ff5e7b55e0a47c",
+      "sanitized_sha256": "c5c56ac70ce2dae2ef64e85a39975363f3e60e518d2b85af80ff5e7b55e0a47c"
+    },
+    {
+      "file": "chatcleaner-developer/scanner.js",
+      "source_sha256": "ab232775ad02d065aa38a24093515035e2e6693ffa7e898dc8ca7b95ea2f59be",
+      "sanitized_sha256": "ab232775ad02d065aa38a24093515035e2e6693ffa7e898dc8ca7b95ea2f59be"
+    },
+    {
+      "file": "chatcleaner-developer/session.js",
+      "source_sha256": "8ecd8650b7ba228993d7b24cfec532b8c5f6b9568cc27e7055f70c0967744e05",
+      "sanitized_sha256": "8ecd8650b7ba228993d7b24cfec532b8c5f6b9568cc27e7055f70c0967744e05"
+    },
+    {
+      "file": "chatcleaner-developer/signm-pipeline.css",
+      "source_sha256": "839850ddb61e39e475022ff33421a91a43361d59aa422be83e3ec7f4d606ef3d",
+      "sanitized_sha256": "839850ddb61e39e475022ff33421a91a43361d59aa422be83e3ec7f4d606ef3d"
+    },
+    {
+      "file": "chatcleaner-developer/signm-pipeline.js",
+      "source_sha256": "b4d948050adb9095f887f45e8cd1bf9d253a9e215e4624702d72896205f65072",
+      "sanitized_sha256": "ea91e6104eef3c9535f8dfe4e56516e5c42d489d826a7153b677037458bd28c3"
+    },
+    {
+      "file": "chatcleaner-developer/simple-operations.css",
+      "source_sha256": "5e8ba51ef5ba1ca4113577e0fe187f2a3250c0979b999b1a39ee04175c30a8ec",
+      "sanitized_sha256": "5e8ba51ef5ba1ca4113577e0fe187f2a3250c0979b999b1a39ee04175c30a8ec"
+    },
+    {
+      "file": "chatcleaner-developer/simple-operations.js",
+      "source_sha256": "6ee7bf5db322e3b5c988d80302dd4bc06d4fee36fb67dcb3fb20b5c871521b32",
+      "sanitized_sha256": "6ee7bf5db322e3b5c988d80302dd4bc06d4fee36fb67dcb3fb20b5c871521b32"
+    },
+    {
+      "file": "chatcleaner-developer/styles.css",
+      "source_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07",
+      "sanitized_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07"
+    }
+  ]
+}

@@ -873,11 +873,7 @@ class ManualInviteCampaign(IsolatedInvite):
                     d = invite_rpc_diagnosis(exc)
                     d.update(member_before=before)
                     return dict(state='restricted', error=d['reason'], diagnosis=d), requested, False
-                result = unconfirmed_invite('Неизвестный результат: ' + type(exc).__name__ + '. Повтор отключён.', evidence, [])
-                # Preserve safe RPC enums and method, never raw exception/request text.
-                result['diagnosis']['verification_error'] = invite_rpc_diagnosis(exc)
-                result['diagnosis']['member_before'] = before
-                return result, requested, True
+                return unconfirmed_invite('Неизвестный результат: ' + type(exc).__name__ + '. Повтор отключён.', evidence, []), requested, True
             if (ctx['record'].get('resolution') == ON_DISPATCH and
                 isinstance(exc, (errors.UserPrivacyRestrictedError, errors.UserNotMutualContactError,
                     errors.UserChannelsTooMuchError, errors.UserKickedError))):

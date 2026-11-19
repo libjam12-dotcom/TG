@@ -104,7 +104,7 @@ class Publisher:
             client=self.runtime.client;entity=await client.get_entity(chat_id)
             if not writable(entity):raise HTTPException(400,'Подключать бота можно только к своим управляемым площадкам.')
             if not isinstance(entity,types.Channel):raise HTTPException(400,'Для обычной группы назначьте бота администратором в Telegram вручную.')
-            bot=await client.get_entity('@DevelopmentDemo_bot')
+            bot=await client.get_entity('@ExampleModerationBot')
             if not getattr(bot,'bot',False):raise HTTPException(409,'Не удалось проверить аккаунт антиспам-бота.')
             current=None
             try:current=(await client(functions.channels.GetParticipantRequest(entity,bot))).participant

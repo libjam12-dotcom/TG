@@ -77,14 +77,14 @@ window.IsolatedContactBatch=(()=>{
   return `<section class="icb-preview" aria-labelledby="icb-list-heading"><h3 id="icb-list-heading">Проверьте список: ${people(preview.selected.length)}</h3>
    <p class="small">Это взаимные контакты клиентки; при проверке они не состояли в группе. Список действует до ${h(stamp(preview.expires_at))}.</p>
    <ol class="icb-people">${preview.selected.map(u=>`<li><strong>@${h(u.username)}</strong><span class="small">Взаимный контакт · ещё не в группе</span></li>`).join('')}</ol>
-   <label class="ls-check"><input type="checkbox" data-icb-confirm${confirmed?' checked':''}${busy?' disabled':''}><span>Проверил этот список и группу «ТЕСТОВОЕ СООБЩЕСТВО». Подтверждаю запуск одного пакета приглашений.</span></label>
+   <label class="ls-check"><input type="checkbox" data-icb-confirm${confirmed?' checked':''}${busy?' disabled':''}><span>Проверил этот список и группу «РУССКИЕ В ДУБАЕ». Подтверждаю запуск одного пакета приглашений.</span></label>
    <div class="ls-actions">${button(busy==='start'?'Запускаем…':`Пригласить ${people(preview.selected.length,true)}`,'start',!canStart(),false)}${button('Проверить список заново','preview',!canPreview())}</div>
   </section>`;
  }
  function draw(){
   const el=root();if(!el)return;
   el.innerHTML=`<style>#isolated-contact-batch{margin-bottom:22px;min-width:0}#isolated-contact-batch p{max-width:78ch;overflow-wrap:anywhere}#isolated-contact-batch .icb-people{padding-left:0;list-style:none;margin:14px 0;border-top:1px solid var(--line,#e5ebef)}#isolated-contact-batch .icb-people li{display:flex;align-items:center;justify-content:space-between;gap:9px 16px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line,#e5ebef);overflow-wrap:anywhere;min-width:0}#isolated-contact-batch .icb-people small{flex-basis:100%}#isolated-contact-batch .icb-counts{display:flex;gap:12px 22px;flex-wrap:wrap;margin:14px 0}#isolated-contact-batch .button{min-height:44px;white-space:normal;max-width:100%;overflow-wrap:anywhere}#isolated-contact-batch h3{margin-top:20px}#isolated-contact-batch .icb-preview,#isolated-contact-batch .icb-results{padding-top:4px}#isolated-contact-batch input[type=checkbox]{width:18px;height:18px;flex-shrink:0}@media(max-width:600px){#isolated-contact-batch .ls-actions{align-items:stretch}#isolated-contact-batch .ls-actions>.button{flex:1 1 210px}#isolated-contact-batch .icb-people li{align-items:flex-start}}</style>
-   <h2 id="icb-heading">Пригласить из контактов клиентки</h2><p>Аккаунт: <strong>@demo_identity_1</strong>. Группа: <strong>ТЕСТОВОЕ СООБЩЕСТВО</strong>.</p>
+   <h2 id="icb-heading">Пригласить из контактов клиентки</h2><p>Аккаунт: <strong>@demo_identity_1</strong>. Группа: <strong>РУССКИЕ В ДУБАЕ</strong>.</p>
    <p class="small">Один пакет до 10 взаимных контактов, пауза между попытками не меньше 60 секунд. Личные сообщения и ссылки не отправляются.</p>
    <p class="small muted">Основные исходящие аккаунта остаются на паузе. Работает только отдельно подтверждённый пакет; прежние задания не запускаются.</p>
    ${error?`<p class="ls-error" role="alert">${h(error)}</p>`:''}${info?`<p class="notice" role="status">${h(info)}</p>`:''}
@@ -124,7 +124,7 @@ window.IsolatedContactBatch=(()=>{
   // Once a POST is attempted the preview is discarded, even if its response is lost.
   clearPreview();unknownWrite=true;
   try{
-   const value=checkStatus(await api('/start',{scope,confirmed:true,reason:'Ручное подтверждение проверенного списка контактов для группы «ТЕСТОВОЕ СООБЩЕСТВО» в панели.',request_key:key,candidate_token:token}));
+   const value=checkStatus(await api('/start',{scope,confirmed:true,reason:'Ручное подтверждение проверенного списка контактов для группы «РУССКИЕ В ДУБАЕ» в панели.',request_key:key,candidate_token:token}));
    require(value.request_key===key&&validId(value.job_id),'Сервер не подтвердил задание этого запуска. Обновите состояние.');
    current=value;unknownWrite=false;info='Пакет запущен. Показаны фактические результаты каждого получателя.';
   }catch(e){error=(e.message||'Ответ на запуск не получен.')+' Повторная отправка не выполняется.';}
