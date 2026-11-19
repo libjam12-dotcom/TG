@@ -38,5 +38,7 @@ class ManualInviteHistoryTests(ManualFixture):
         self.assertEqual(len(self.client.calls), 1)
         self.assertEqual(self.client.calls[0].users[0].id, self.client.users[0].id)
         for item in result['items'][1:]:
-            self.assertEqual(item['diagnosis']['code'], 'target_history_exists')
+            self.assertEqual(item['diagnosis']['code'], 'target_history_unresolved')
+            self.assertFalse(item['diagnosis']['retry_after_change'])
+            self.assertFalse(item['diagnosis']['member_before']['member'])
             self.assertFalse(item['diagnosis']['invitation_requested'])

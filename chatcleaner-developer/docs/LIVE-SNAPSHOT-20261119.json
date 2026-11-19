@@ -179,8 +179,8 @@
     },
     {
       "file": "chatcleaner-developer/scanner/manual_invite_campaign.py",
-      "source_sha256": "c3bdc3f5546105919bd15b6c787f70f127b6ee1430fe12b0ee1287c7584243e6",
-      "sanitized_sha256": "c3bdc3f5546105919bd15b6c787f70f127b6ee1430fe12b0ee1287c7584243e6"
+      "source_sha256": "3e6dd43def981570c80b32a3dba37fd54cdcd060e5e21137149fe2e316d64292",
+      "sanitized_sha256": "3e6dd43def981570c80b32a3dba37fd54cdcd060e5e21137149fe2e316d64292"
     },
     {
       "file": "chatcleaner-developer/scanner/marketing.py",
@@ -364,8 +364,8 @@
     },
     {
       "file": "chatcleaner-developer/index.html",
-      "source_sha256": "20b217556d34e56c480a8935e63a7f90428baeb529ac0f73b7b627360412975c",
-      "sanitized_sha256": "20b217556d34e56c480a8935e63a7f90428baeb529ac0f73b7b627360412975c"
+      "source_sha256": "5ec666e35557e407d4c03d409110d65d8caf6a0803681d91c4f2a9a6c3b91255",
+      "sanitized_sha256": "5ec666e35557e407d4c03d409110d65d8caf6a0803681d91c4f2a9a6c3b91255"
     },
     {
       "file": "chatcleaner-developer/isolated-contact-batch.js",
@@ -379,8 +379,8 @@
     },
     {
       "file": "chatcleaner-developer/manual-invite-campaign.js",
-      "source_sha256": "8c6ffc3c5fbe0838bf7e273184b4be427fc0853024c6d6d54cd20da85509a700",
-      "sanitized_sha256": "8c6ffc3c5fbe0838bf7e273184b4be427fc0853024c6d6d54cd20da85509a700"
+      "source_sha256": "30fbb1d46fd325c0825d1c602abb833157a2ca5bb6b511d8b23798396dd90e37",
+      "sanitized_sha256": "30fbb1d46fd325c0825d1c602abb833157a2ca5bb6b511d8b23798396dd90e37"
     },
     {
       "file": "chatcleaner-developer/marketing.js",
@@ -497,5 +497,6 @@
       "source_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07",
       "sanitized_sha256": "e618fd0664d8cfd228b7c57c2903521df14ceca5ac57ad3d6885c04a1483cd07"
     }
-  ]
+  ],
+  "release_update": "invite-history-retry-20261119-r1"
 }

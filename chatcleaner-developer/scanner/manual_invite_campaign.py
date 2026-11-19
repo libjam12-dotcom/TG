@@ -1,6 +1,6 @@
 """Explicit finite manual invitations on native operation history; no queue enablement.
 
-No contact enumeration/import, account rotation, write retry, or startup resume.
+No contact enumeration/import, account rotation, automatic write retry, or startup resume.
 Only this controller can dispatch a persisted manual campaign, one durable claim
 per recipient, with fresh sender/rights/user/membership evidence before the RPC.
 """
@@ -54,6 +54,7 @@ class ManualConfig(Strict):
     users: list[str] = Field(min_length=1, max_length=1000)
     consent_note: str = Field(min_length=8, max_length=500)
     consent_confirmed: bool
+    retry_after_change_confirmed: bool = Field(default=False, strict=True)
     max_attempts: int = Field(default=25, ge=1, le=1000, strict=True)
     account_day_attempt_cap: int = Field(default=25, ge=1, le=1000, strict=True)
     success_goal: int | None = Field(default=None, ge=1, le=1000, strict=True)
@@ -260,6 +261,39 @@ class ManualInviteCampaign(IsolatedInvite):
             "WHERE j.kind='invite' AND i.chat_id=? AND i.user_id=? AND i.job!=? "
             "AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending')) "
             'UNION SELECT 1 FROM op_invited WHERE chat_id=? AND user_id=? LIMIT 1', (target, uid, jid or -1, target, uid)))
+
+    def history_retry_blocker(self, target, uid, jid=None):
+        """A new campaign may repeat confirmed history, never an ambiguous write.
+
+        Keep every item and marker intact. Check all senders, because switching
+        accounts must not bypass a previous in-flight or unconfirmed invitation.
+        """
+        rows = self.store.rows('SELECT i.state,i.diagnosis,i.job FROM op_items i JOIN op_jobs j ON j.id=i.job '
+            "WHERE j.kind='invite' AND i.chat_id=? AND i.user_id=? AND i.job!=? "
+            "AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending'))",
+            (target, uid, jid or -1))
+        markers = self.store.rows('SELECT state,job FROM op_invited WHERE chat_id=? AND user_id=?', (target, uid))
+        retryable_jobs = set()
+        for row in rows:
+            try:
+                diagnosis = json.loads(row['diagnosis'] or '{}')
+            except (TypeError, ValueError):
+                return 'target_history_unresolved'
+            if not isinstance(diagnosis, dict) or diagnosis.get('request_outcome_unknown'):
+                return 'target_history_unresolved'
+            if row['state'] in ('invited', 'already_member'):
+                continue
+            if row['state'] == 'restricted' and diagnosis.get('retry_after_change') is True:
+                retryable_jobs.add(row['job'])
+                continue
+            return 'target_history_unresolved'
+        for marker in markers:
+            if marker['state'] in ('invited', 'already_member'):
+                continue
+            if marker['state'] == 'restricted' and marker['job'] in retryable_jobs:
+                continue
+            return 'target_history_unresolved'
+        return None
 
     def competing(self, config, jid=None):
         if self.store.rows('SELECT 1 FROM op_jobs j LEFT JOIN op_items i ON i.job=j.id '
@@ -819,14 +853,21 @@ class ManualInviteCampaign(IsolatedInvite):
                 raise fail(409, 'Личность или имя получателя изменились.')
             if quick and item['user_id'] is None:
                 self.seal_recipient(ctx, item, user)
-            if self.historical(cfg['target_id'], user.id, ctx['job_id']):
-                return dict(state='duplicate_skipped', diagnosis={'code': 'target_history_exists',
-                    'reason': 'Для этого человека уже есть запись о прямом приглашении в эту группу. Новый запрос не отправлен.'}), False, False
             before = await self.read(ctx, lambda: self.ops.read_membership(ctx['client'], group, user))
             if before['member'] is True:
                 return dict(state='already_member', diagnosis={'code': 'member_before_invite', 'member_before': before}), False, False
             if before['member'] is not False:
                 raise fail(409, 'Отсутствие участника в группе не подтверждено.')
+            if self.historical(cfg['target_id'], user.id, ctx['job_id']):
+                blocker = self.history_retry_blocker(cfg['target_id'], user.id, ctx['job_id'])
+                if blocker or not cfg.get('retry_after_change_confirmed', False):
+                    diagnosis = dict(code=blocker or 'target_history_exists', member_before=before,
+                        retry_after_change=not bool(blocker),
+                        reason=('Сейчас участник отсутствует, но прежний результат приглашения не позволяет безопасный повтор. Новый запрос не отправлен.'
+                            if blocker else 'Сейчас участник отсутствует в группе. Есть история прямого приглашения; отдельное подтверждение повтора не получено. Новый запрос не отправлен.'),
+                        next_action=('Проверьте прежний результат в Telegram и журнале. Подтверждение повтора не снимает блокировку неопределённого результата.'
+                            if blocker else 'После изменения приватности или выхода из группы создайте новую кампанию и отдельно подтвердите повтор для выбранных людей.'))
+                    return dict(state='duplicate_skipped', diagnosis=diagnosis), False, False
             job = dict(id=ctx['job_id'], account=cfg['account'], telegram_id=cfg['telegram_id'], kind='invite', spec={})
             self.ops.workbench.guard(ctx['account'], job, item, group, user)
             self.claim(ctx, item)
@@ -850,7 +891,7 @@ class ManualInviteCampaign(IsolatedInvite):
                 if after['member'] is True:
                     return dict(state='invited', diagnosis=dict(code='invite_member_verified', member_before=before, member_after=after,
                         response=evidence, verification=verification, retry_after_change=False)), True, False
-            result = unconfirmed_invite('Членство после запроса не подтверждено. Кампания остановлена.', evidence, verification)
+            result = unconfirmed_invite('Telegram вернул ответ на запрос, но последующие проверки не подтвердили членство. Кампания остановлена.', evidence, verification)
             result['diagnosis'].update(member_before=before, member_after=after)
             return result, True, True
         except ResolvedDuplicate:
