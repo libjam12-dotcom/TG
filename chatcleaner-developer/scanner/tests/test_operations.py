@@ -305,7 +305,11 @@ class OperationsTests(unittest.IsolatedAsyncioTestCase):
   self.assertEqual(result['attribution'],'current_membership_only');self.assertFalse(result['history_changed']);self.assertFalse(result['invitation_requested'])
   self.assertTrue(any(isinstance(ref,types.InputPeerUser) and ref.user_id==200 and ref.access_hash==1 for ref in refs))
   self.assertFalse(any(isinstance(ref,str) for ref in refs));self.assertFalse(self.c.calls)
-  for table,rows in before.items():self.assertEqual(self.ops.store.rows('SELECT * FROM '+table),rows)
+  for table,rows in before.items():
+   if table!='settings':self.assertEqual(self.ops.store.rows('SELECT * FROM '+table),rows)
+  current=self.ops.store.get('invite_membership_current_'+str(item['id']))
+  self.assertEqual((current['target_id'],current['user_id'],current['member']),(item['chat_id'],item['user_id'],True))
+  self.assertEqual(self.ops.store.rows("SELECT * FROM settings WHERE key NOT LIKE 'invite_membership_current_%'"),before['settings'])
   self.assertFalse(set(result)&{'user_access_hash','access_hash','phone','text','spec'})
  async def test_reconcile_unknown_or_departed_membership_does_not_reclassify_historical_invite(self):
   j=await self.draft('invite');item=j['items'][0];self.a.pause()
