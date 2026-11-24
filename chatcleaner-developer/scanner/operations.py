@@ -215,6 +215,14 @@ SINGLE_KNOWN_RESULTS=('invited','already_member','restricted','failed','blocked'
 # Official method errors absent from pinned Telethon 1.40.0's enum map.
 # https://core.telegram.org/method/channels.inviteToChannel
 INVITE_TO_CHANNEL_EXTRA_RPC_ENUMS=frozenset({'CHAT_MEMBER_ADD_FAILED','CHANNEL_MONOFORUM_UNSUPPORTED'})
+# A closed list: only an explicit rejection of this recipient at the invite
+# method permits advancing. Unknown errors and errors in reads always stop.
+INVITE_RECIPIENT_RPC=frozenset({'USER_PRIVACY_RESTRICTED','USER_NOT_MUTUAL_CONTACT',
+    'USER_CHANNELS_TOO_MUCH','USER_KICKED','USER_BLOCKED','USER_BOT',
+    'INPUT_USER_DEACTIVATED','USER_ID_INVALID','BOT_GROUPS_BLOCKED','CHAT_MEMBER_ADD_FAILED'})
+INVITE_TARGET_RPC=frozenset({'CHAT_INVALID','CHANNEL_INVALID','CHANNEL_MONOFORUM_UNSUPPORTED',
+    'CHANNEL_PRIVATE','CHAT_ADMIN_REQUIRED','CHAT_WRITE_FORBIDDEN','USERS_TOO_MUCH',
+    'BOTS_TOO_MUCH','USER_BANNED_IN_CHANNEL','MSG_ID_INVALID'})
 
 def safe_error(exc):
     names={'UserPrivacyRestrictedError':'Настройки приватности пользователя запрещают приглашение.',
@@ -261,6 +269,38 @@ def invite_rpc_diagnosis(exc):
             'retry_after_change':code in ('UserPrivacyRestrictedError','UserNotMutualContactError'),
             'rpc':safe_rpc_metadata(exc)}
 
+
+def classify_invite_failure(exc, phase):
+    """Safe, phase-specific queue policy; no raw exception text or request data."""
+    diagnosis=invite_rpc_diagnosis(exc)
+    rpc=diagnosis['rpc']
+    code=rpc['message']
+    if isinstance(exc,errors.FloodWaitError):code='FLOOD_WAIT'
+    elif isinstance(exc,errors.PeerFloodError):code='PEER_FLOOD'
+    elif isinstance(exc,TimeoutError):code='transport_timeout'
+    elif isinstance(exc,(ConnectionError,OSError)):code='transport_error'
+    elif isinstance(exc,HTTPException):code=phase+'_http_'+str(exc.status_code)
+    elif isinstance(exc,WorkbenchStopped):code='dispatch_context_changed'
+    elif not isinstance(exc,errors.RPCError):
+        code='internal_error'
+    code=code or 'unknown_rpc_error'
+    recipient=(phase=='invite_rpc' and code in INVITE_RECIPIENT_RPC and
+        rpc['code'] in (400,403) and rpc['request_constructor']=='InviteToChannelRequest')
+    rejected=phase=='invite_rpc' and isinstance(exc,errors.RPCError)
+    if code=='CHAT_MEMBER_ADD_FAILED':
+        diagnosis['reason']='Telegram не смог добавить получателя. Точная причина не раскрыта.'
+    elif code not in ('PEER_FLOOD','FLOOD_WAIT') and type(exc) in (errors.BadRequestError,errors.RPCError):
+        diagnosis['reason']='Telegram отклонил запрос: '+code+'.' if rpc['message'] else 'Детали RPC-ошибки недоступны.'
+    elif not isinstance(exc,errors.RPCError):
+        diagnosis['reason']='Проверка контекста прервана; очередь остановлена.' if isinstance(exc,(HTTPException,WorkbenchStopped)) else 'Ответ операции не получен; автоматического повтора нет.'
+    diagnosis.update(code=code,phase=phase,checked_at=now(),queue_action='next_recipient' if recipient else 'stop',
+        outcome='recipient_rejected' if recipient else 'request_rejected' if rejected else 'operation_stopped',
+        stop_reason=None if recipient else code,
+        retry_after_change=recipient and code in ('USER_PRIVACY_RESTRICTED','USER_NOT_MUTUAL_CONTACT'),
+        scope='recipient' if recipient else 'target' if code in INVITE_TARGET_RPC else 'operation')
+    if isinstance(exc,errors.FloodWaitError):diagnosis['wait_seconds']=max(0,exc.seconds)
+    return diagnosis
+
 def missing_invitee_diagnosis(invitee):
     premium=bool(getattr(invitee,'premium_would_allow_invite',False))
     premium_pm=bool(getattr(invitee,'premium_required_for_pm',False))
@@ -282,12 +322,22 @@ def participant_membership(permissions):
     participant=getattr(permissions,'participant',None)
     if isinstance(participant,types.ChannelParticipantLeft):return False
     if isinstance(participant,types.ChannelParticipantBanned):
-        return not bool(participant.left or participant.banned_rights.view_messages)
+        left=participant_flag(participant,'left')
+        view=participant_flag(getattr(participant,'banned_rights',None),'view_messages')
+        if left is True or view is True:return False
+        return True if left is False and view is False else None
     if isinstance(participant,(types.ChannelParticipant,types.ChannelParticipantSelf,
                               types.ChannelParticipantAdmin,types.ChannelParticipantCreator,
                               types.ChatParticipant,types.ChatParticipantAdmin,types.ChatParticipantCreator)):
         return True
     return None  # An unrecognised response is not proof of membership.
+
+
+def participant_flag(value, name):
+    # Optional TL flags use None for an unset bit. A missing field is unknown.
+    if value is None or not hasattr(value,name):return None
+    flag=getattr(value,name)
+    return bool(flag) if flag is None or type(flag) is bool else None
 
 def invite_response_evidence(result,*,target_id=None,user_id=None,sender_id=None):
     """Only types and invitation flags; never serialise Telegram entities/messages."""
@@ -862,15 +912,25 @@ class Operations:
             if any(r and r.send_messages for r in banned):raise HTTPException(403,'В группе запрещена отправка сообщений.')
         return {'id':utils.get_peer_id(entity),'title':entity.title,'username':getattr(entity,'username',None),'managed':managed,'can_invite':creator or bool(rights and rights.invite_users),'forum':bool(getattr(entity,'forum',False)),'kind':'Канал' if getattr(entity,'broadcast',False) else 'Группа'}
     async def read_membership(self,client,entity,user):
+        binding={'target_id':utils.get_peer_id(entity),'user_id':user.id,'source':'get_permissions','checked_at':now()}
         try:permissions=await client.get_permissions(entity,user)
         except errors.UserNotParticipantError:
-            return {'member':False,'participant_type':None,'error_type':'UserNotParticipantError','checked_at':now()}
+            return {**binding,'member':False,'participant_type':None,'left':None,'view_messages':None,
+                    'active_ban':None,'restriction_until':None,'error_type':'UserNotParticipantError','checked_at':now()}
         participant=getattr(permissions,'participant',None)
         peer=getattr(participant,'peer',None)
         participant_id=getattr(participant,'user_id',getattr(peer,'user_id',None))
         member=participant_membership(permissions) if participant_id==user.id else None
-        return {'member':member,
-                'participant_type':type(participant).__name__ if participant is not None else None,'checked_at':now()}
+        rights=getattr(participant,'banned_rights',None) if participant_id==user.id else None
+        left=participant_flag(participant,'left') if participant_id==user.id else None
+        view=participant_flag(rights,'view_messages')
+        until=getattr(rights,'until_date',None)
+        if isinstance(until,datetime) and until.tzinfo:until=until.timestamp()
+        if type(until) not in (int,float):until=None
+        active_ban=(False if view is False else (until<=0 or until>time.time()) if view is True and until is not None else None)
+        return {**binding,'member':member,'participant_id_confirmed':participant_id==user.id,
+                'participant_type':type(participant).__name__ if participant is not None else None,
+                'left':left,'view_messages':view,'restriction_until':until,'active_ban':active_ban,'checked_at':now()}
     async def resolve_invite_user(self,client,item):
         """Retain the account-scoped peer; legacy usernames may only recover the same ID."""
         uid=item['user_id'];access_hash=item.get('user_access_hash')
@@ -933,13 +993,16 @@ class Operations:
         except TimeoutError:raise HTTPException(504,'Telegram долго отвечает на диагностику. Исходящие не включались.') from None
 
     async def item_membership(self,jid:int,iid:int):
+        return await self.saved_item_membership(jid,iid,persist_current=True)
+
+    async def saved_item_membership(self,jid,iid,*,persist_current=False):
         rows=self.store.rows('SELECT i.*,j.account,j.telegram_id,j.kind FROM op_items i JOIN op_jobs j ON j.id=i.job WHERE j.id=? AND i.id=?',(jid,iid))
         if not rows:raise HTTPException(404,'Получатель этого задания не найден.')
         item=rows[0]
         if item['kind']!='invite' or not item['user_id']:raise HTTPException(400,'Проверка доступна для сохранённого прямого приглашения.')
-        return await self.membership_read(item['account'],item['chat_id'],item=item)
+        return await self.membership_read(item['account'],item['chat_id'],item=item,persist_current=persist_current)
 
-    async def membership_read(self,aid,target,*,ref=None,item=None):
+    async def membership_read(self,aid,target,*,ref=None,item=None,persist_current=False):
         client=None;sender_id=None
         def same_reader(*,check_cooldown=True):
             current=self.readable_account(aid,check_cooldown=check_cooldown)
@@ -966,6 +1029,11 @@ class Operations:
                     if not current or any(current[0][key]!=item[key] for key in ('job','account','telegram_id','kind','chat_id','user_id','user_access_hash')):
                         raise HTTPException(409,'Сохранённая привязка приглашения изменилась во время проверки.')
                     history_state=current[0]['state']
+                    # Readback is current evidence, never a rewrite of the historical outcome.
+                    if persist_current:
+                        with self.store.db:
+                            self.store.db.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                                ('invite_membership_current_'+str(item['id']),json.dumps(dict(checked,job_id=item['job'],item_id=item['id']))))
                 return {'account':aid,'sender':a.me.username,'sender_id':sender_id,'target':group['id'],'username':user.username,'user_id':user.id,
                         **contact_flags(user),**checked,'history_state':history_state,
                         'outbound_paused':not bool(self.account_row(aid)['enabled']),
@@ -1178,7 +1246,7 @@ class Operations:
         item=next((i for i in j['items'] if i['id']==iid),None)
         if j['kind']!='invite' or not item:raise HTTPException(404,'Участник прямого приглашения не найден.')
         fingerprint=self.pilot_cohort(j)[1]
-        check=await self.item_membership(jid,iid)
+        check=await self.saved_item_membership(jid,iid)
         fresh=await self.detail(jid)
         if self.pilot_cohort(fresh)[1]!=fingerprint:raise HTTPException(409,'Задание изменилось во время предпросмотра.')
         item=next(i for i in fresh['items'] if i['id']==iid);row=self.account_row(j['account']);budget=self.single_budget(fresh)

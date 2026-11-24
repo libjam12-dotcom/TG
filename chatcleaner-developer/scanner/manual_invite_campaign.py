@@ -1,6 +1,6 @@
 """Explicit finite manual invitations on native operation history; no queue enablement.
 
-No contact enumeration/import, account rotation, write retry, or startup resume.
+No contact enumeration/import, account rotation, automatic write retry, or startup resume.
 Only this controller can dispatch a persisted manual campaign, one durable claim
 per recipient, with fresh sender/rights/user/membership evidence before the RPC.
 """
@@ -26,6 +26,8 @@ CLAIM_PREFIX = 'manual_invite_campaign_claim_'
 START_PREFIX = 'manual_invite_campaign_start_'
 QUICK_DRAFT_PREFIX = 'manual_invite_campaign_quick_draft_'
 RESOLVED_PREFIX = 'manual_invite_campaign_resolved_'
+RESTRICTION_PREFIX = 'manual_invite_sender_restriction_'
+REVIEW_PREFIX = 'manual_invite_restriction_review_'
 ON_DISPATCH = 'on_dispatch'
 TOKEN_TTL = 300
 READ_TIMEOUT = 3600
@@ -54,6 +56,7 @@ class ManualConfig(Strict):
     users: list[str] = Field(min_length=1, max_length=1000)
     consent_note: str = Field(min_length=8, max_length=500)
     consent_confirmed: bool
+    retry_after_change_confirmed: bool = Field(default=False, strict=True)
     max_attempts: int = Field(default=25, ge=1, le=1000, strict=True)
     account_day_attempt_cap: int = Field(default=25, ge=1, le=1000, strict=True)
     success_goal: int | None = Field(default=None, ge=1, le=1000, strict=True)
@@ -142,6 +145,21 @@ class PauseRequest(Strict):
     job_id: int = Field(gt=0, strict=True)
 
 
+class ReviewRestriction(Strict):
+    job_id: int = Field(gt=0, strict=True)
+    restriction_digest: str = Field(pattern=r'^[a-f0-9]{64}$')
+    request_key: str = Field(pattern=r'^[A-Za-z0-9._:-]{16,80}$')
+    reason: str = Field(min_length=8, max_length=500)
+    confirmed: bool
+
+    @field_validator('confirmed', mode='before')
+    @classmethod
+    def confirmation(cls, value):
+        if value is not True:
+            raise ValueError('Отдельно подтвердите пересмотр локальной остановки.')
+        return True
+
+
 class ManualInviteCampaign(IsolatedInvite):
     def __init__(self, ops):
         self.ops, self.store = ops, ops.store
@@ -157,6 +175,7 @@ class ManualInviteCampaign(IsolatedInvite):
             ('/jobs/{jid}/preview', self.preview_job, ['POST']), ('/start', self.start, ['POST']),
             ('/pause', self.pause, ['POST']), ('/status', self.status, ['GET']),
             ('/quick-draft', self.quick_draft, ['POST']), ('/quick-start', self.quick_start, ['POST']),
+            ('/review-restriction', self.review_restriction, ['POST']),
             ('/draft-requests/{request_key}', self.draft_request, ['GET'])]:
             self.router.add_api_route(path, fn, methods=methods)
 
@@ -261,6 +280,39 @@ class ManualInviteCampaign(IsolatedInvite):
             "AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending')) "
             'UNION SELECT 1 FROM op_invited WHERE chat_id=? AND user_id=? LIMIT 1', (target, uid, jid or -1, target, uid)))
 
+    def history_retry_blocker(self, target, uid, jid=None):
+        """A new campaign may repeat confirmed history, never an ambiguous write.
+
+        Keep every item and marker intact. Check all senders, because switching
+        accounts must not bypass a previous in-flight or unconfirmed invitation.
+        """
+        rows = self.store.rows('SELECT i.state,i.diagnosis,i.job FROM op_items i JOIN op_jobs j ON j.id=i.job '
+            "WHERE j.kind='invite' AND i.chat_id=? AND i.user_id=? AND i.job!=? "
+            "AND (i.attempted_at IS NOT NULL OR i.state IN ('already_member','invited','uncertain','sending'))",
+            (target, uid, jid or -1))
+        markers = self.store.rows('SELECT state,job FROM op_invited WHERE chat_id=? AND user_id=?', (target, uid))
+        retryable_jobs = set()
+        for row in rows:
+            try:
+                diagnosis = json.loads(row['diagnosis'] or '{}')
+            except (TypeError, ValueError):
+                return 'target_history_unresolved'
+            if not isinstance(diagnosis, dict) or diagnosis.get('request_outcome_unknown'):
+                return 'target_history_unresolved'
+            if row['state'] in ('invited', 'already_member'):
+                continue
+            if row['state'] == 'restricted' and diagnosis.get('retry_after_change') is True:
+                retryable_jobs.add(row['job'])
+                continue
+            return 'target_history_unresolved'
+        for marker in markers:
+            if marker['state'] in ('invited', 'already_member'):
+                continue
+            if marker['state'] == 'restricted' and marker['job'] in retryable_jobs:
+                continue
+            return 'target_history_unresolved'
+        return None
+
     def competing(self, config, jid=None):
         if self.store.rows('SELECT 1 FROM op_jobs j LEFT JOIN op_items i ON i.job=j.id '
             "WHERE j.telegram_id=? AND j.id!=? AND (j.state IN ('queued','scheduled') OR i.state='sending') LIMIT 1",
@@ -326,20 +378,39 @@ class ManualInviteCampaign(IsolatedInvite):
         return value
 
     def protect(self, ctx, exc):
+        from operations import classify_invite_failure
         cfg = ctx['config']
         if self.ops.accounts.get(cfg['account']) is not ctx['account'] or ctx['account'].client is not ctx['client']:
             return
+        server_until = None
         if isinstance(exc, errors.FloodWaitError):
+            server_until = time.time() + exc.seconds + 1
             with self.store.db:
                 self.store.db.execute('UPDATE op_accounts SET not_before=MAX(not_before,?) WHERE id=? AND telegram_id=?',
-                    (time.time() + exc.seconds + 1, cfg['account'], cfg['telegram_id']))
+                    (server_until, cfg['account'], cfg['telegram_id']))
         elif isinstance(exc, (errors.PeerFloodError, *REVOKED)):
             self.ops.pause_outbound(cfg['account'], exc)
+        if isinstance(exc, (errors.FloodWaitError, errors.PeerFloodError, *REVOKED)):
+            diagnosis = classify_invite_failure(exc, ctx.get('phase', 'preflight'))
+            previous = self.store.get(RESTRICTION_PREFIX + str(cfg['telegram_id'])) or {}
+            if server_until is not None and previous.get('wait_until') is not None:
+                server_until = max(server_until, previous['wait_until'])
+            restriction = dict(code=diagnosis['code'], phase=diagnosis['phase'], checked_at=now(),
+                telegram_id=cfg['telegram_id'], account=cfg['account'],
+                wait_until=server_until)
+            # A timed wait cannot clear an earlier restriction with no known expiry.
+            if not previous or previous.get('wait_until') is not None:
+                with self.store.db:
+                    self.store.db.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                        (RESTRICTION_PREFIX + str(cfg['telegram_id']), json.dumps(restriction)))
+            if ctx.get('record') and isinstance(exc, errors.FloodWaitError):
+                ctx['record']['telegram_wait_until'] = restriction['wait_until']
 
     async def identity(self, ctx):
         user = await self.read(ctx, ctx['client'].get_me)
         if not isinstance(user, types.User) or user.id != ctx['config']['telegram_id'] or user.bot or user.deleted:
             raise fail(409, 'Telegram не подтвердил выбранного отправителя.')
+        ctx.setdefault('preflight', {})['sender'] = dict(telegram_id=user.id, checked_at=now())
 
     async def group(self, ctx):
         cfg = ctx['config']
@@ -347,7 +418,9 @@ class ManualInviteCampaign(IsolatedInvite):
         if (not isinstance(group, types.Channel) or not group.megagroup or utils.get_peer_id(group) != cfg['target_id'] or
             (cfg['target_username'] or '').lower() != (getattr(group, 'username', None) or '').lower()):
             raise fail(409, 'Выбранная группа или её имя изменились. Загрузите группы заново.')
-        await self.read(ctx, lambda: self.ops.rights(ctx['account'], group, 'invite'))
+        rights = await self.read(ctx, lambda: self.ops.rights(ctx['account'], group, 'invite'))
+        ctx.setdefault('preflight', {})['target'] = dict(target_id=rights['id'], managed=rights['managed'],
+            can_invite=rights['can_invite'], checked_at=now())
         return group
 
     @staticmethod
@@ -536,6 +609,16 @@ class ManualInviteCampaign(IsolatedInvite):
             proof.update(job_id=record['job_id'], frozen_items=self.items(record['job_id']))
             return self.public(record)
 
+    def stop_limit(self, record, counts, used):
+        cfg = record['config']
+        if cfg['success_goal'] and counts['added'] >= cfg['success_goal']:
+            return 'verified_goal_reached'
+        if record['attempts_claimed'] >= cfg['max_attempts']:
+            return 'campaign_attempt_cap_reached'
+        if used >= cfg['account_day_attempt_cap']:
+            return 'account_day_attempt_cap_reached'
+        return None
+
     def public(self, record):
         items = self.store.rows('SELECT id,user_id,user_name,state,attempted_at,finished_at,diagnosis,error FROM op_items WHERE job=? ORDER BY id', (record['job_id'],))
         counts = dict(total=len(items), attempts=sum(bool(i['attempted_at']) for i in items), added=0)
@@ -543,13 +626,46 @@ class ManualInviteCampaign(IsolatedInvite):
             item['diagnosis'] = json.loads(item['diagnosis'] or '{}')
             counts[item['state']] = counts.get(item['state'], 0) + 1
             d = item['diagnosis']
+            current = self.store.get('invite_membership_current_' + str(item['id']))
+            if (isinstance(current, dict) and current.get('job_id') == record['job_id'] and
+                current.get('target_id') == record['config']['target_id'] and current.get('user_id') == item['user_id']):
+                item['current_membership'] = current
             if item['state'] == 'invited' and d.get('member_before', {}).get('member') is False and d.get('member_after', {}).get('member') is True and d.get('invitation_requested') is True:
                 counts['added'] += 1
+        counts['rejected'] = sum(bool(i['attempted_at']) and (i['state'] in ('restricted', 'failed') or
+            i['diagnosis'].get('outcome') == 'request_rejected') for i in items)
+        counts['skipped_without_request'] = sum(not i['attempted_at'] and i['state'] not in ('pending', 'sending') for i in items)
+        counts['pending'] = counts.get('pending', 0)
         row = self.ops.account_row(record['config']['account'])
         sender_error=self.sender_error(record['config'])
+        baseline = record.get('run_baseline')
+        last_run = dict(started_at=record.get('started_at'), **{key: counts[key] - baseline[key] for key in ('attempts', 'added')}) if baseline else None
+        restriction = self.invite_restriction(record['config'])
+        review_token = self.review_digest(record['config']) if restriction and restriction.get('code') == 'PEER_FLOOD' else None
+        from spambot_check import PREFIX as SPAM_PREFIX, SENDER_PREFIX, SCOPE as SPAM_SCOPE
+        spam_key = self.store.get(SENDER_PREFIX + str(record['config']['telegram_id']))
+        spam = self.store.get(SPAM_PREFIX + spam_key) if isinstance(spam_key, str) else None
+        spam = {k: spam.get(k) for k in ('state', 'checked_at', 'finished_at', 'replies')} if (isinstance(spam, dict) and
+            spam.get('scope') == SPAM_SCOPE and spam.get('telegram_id') == record['config']['telegram_id'] and
+            spam.get('account') == record['config']['account']) else None
+        used = self.attempts_today(record['config']['telegram_id'])
+        resume_block = self.stop_limit(record, counts, used)
+        if sender_error:
+            resume_block = 'sender_restricted'
+        try:
+            sender = self.ops.readable_account(record['config']['account'])
+            if sender.me.id != record['config']['telegram_id']:
+                resume_block = 'sender_changed'
+        except HTTPException as exc:
+            resume_block = 'sender_cooldown' if exc.status_code == 429 else 'sender_unavailable'
+        if not resume_block and self.competing(record['config'], record['job_id']):
+            resume_block = 'other_outbound_active'
         return dict(**record, counts=counts, items=items, account=record['config']['account'], telegram_id=record['config']['telegram_id'],
-            account_attempts_today=self.attempts_today(record['config']['telegram_id']), outbound_paused=not bool(row['enabled']), sender_error=sender_error,
-            can_pause=record['state'] in ACTIVE, can_resume=not bool(sender_error) and record['state'] in ('paused', 'interrupted', 'stopped') and any(i['state'] == 'pending' for i in items),
+            last_run=last_run, direct_invite_restriction=restriction, spambot=spam,
+            restriction_review_digest=review_token,
+            can_review_restriction=bool(review_token) and not row['enabled'] and row['not_before'] <= time.time() and record['state'] in ('paused', 'interrupted', 'stopped'),
+            account_attempts_today=used, outbound_paused=not bool(row['enabled']), sender_error=sender_error,
+            can_pause=record['state'] in ACTIVE, resume_block_reason=resume_block, can_resume=not resume_block and record['state'] in ('paused', 'interrupted', 'stopped') and any(i['state'] == 'pending' for i in items),
             invitation_requested=bool(counts['attempts']))
 
     async def status(self, job_id: int):
@@ -558,7 +674,97 @@ class ManualInviteCampaign(IsolatedInvite):
     def sender_error(self, config):
         row=self.ops.account_row(config['account'])
         account=self.ops.accounts.get(config['account'])
-        return row.get('error') or getattr(account,'error',None) or None
+        restriction = self.invite_restriction(config)
+        return row.get('error') or getattr(account,'error',None) or (restriction['code'] if restriction else None)
+
+    def invite_restriction(self, config):
+        missing = object()
+        value = self.store.get(RESTRICTION_PREFIX + str(config['telegram_id']), missing)
+        if value is missing:
+            # Upgrade path: use only the latest exact method error. Never infer
+            # PEER_FLOOD from an old generic BadRequest or rewrite recipient history.
+            rows = self.store.rows('SELECT i.id,i.job,i.diagnosis,i.attempted_at,i.finished_at,j.account FROM op_items i JOIN op_jobs j ON j.id=i.job '
+                "WHERE j.kind='invite' AND j.telegram_id=? AND i.attempted_at IS NOT NULL ORDER BY i.attempted_at DESC,i.id DESC LIMIT 1", (config['telegram_id'],))
+            if not rows:
+                return None
+            item = rows[0]
+            try:
+                diagnosis = json.loads(item['diagnosis'] or '{}')
+                failure = diagnosis.get('verification_error') or diagnosis
+                rpc = failure.get('rpc') or {}
+            except (TypeError, ValueError, AttributeError):
+                return None
+            if rpc.get('message') != 'PEER_FLOOD' or rpc.get('request_constructor') != 'InviteToChannelRequest':
+                return None
+            return dict(code='PEER_FLOOD', phase='invite_rpc', checked_at=item['finished_at'] or item['attempted_at'],
+                telegram_id=config['telegram_id'], account=item['account'], wait_until=None,
+                source='legacy_rpc_history', job_id=item['job'], item_id=item['id'])
+        if not isinstance(value, dict) or value.get('telegram_id') != config['telegram_id']:
+            return None
+        return value if value.get('wait_until') is None or value['wait_until'] > time.time() else None
+
+    def review_digest(self, config):
+        row = self.ops.account_row(config['account'])
+        account = self.ops.accounts.get(config['account'])
+        return digest(dict(account=config['account'], telegram_id=config['telegram_id'],
+            restriction=self.invite_restriction(config), revision=self.store.get('outbound_pause_revision_' + config['account'], 0),
+            row={key: row[key] for key in ('telegram_id', 'enabled', 'error', 'not_before')}, runtime_error=getattr(account, 'error', None)))
+
+    async def review_restriction(self, spec: ReviewRestriction):
+        """Explicit local review only: no invitation, queue start, or general enablement."""
+        from operations import safe_error
+        if len(spec.reason.strip()) < 8:
+            raise fail(400, 'Опишите результат ручной проверки в Telegram.')
+        async with self.locked(time.monotonic() + 25):
+            old = self.store.get(REVIEW_PREFIX + spec.request_key)
+            request_digest = digest(spec.model_dump())
+            if old:
+                if old['digest'] != request_digest:
+                    raise fail(409, 'Ключ пересмотра уже использован с другими параметрами.')
+                return self.public(self.record(old['job_id']))
+            record = self.record(spec.job_id)
+            self.job(spec.job_id)
+            cfg = record['config']
+            restriction = self.invite_restriction(cfg)
+            if not restriction or restriction.get('code') != 'PEER_FLOOD':
+                raise fail(409, 'Эта операция пересматривает только сохранённую локальную остановку PEER_FLOOD.')
+            if record['state'] not in ('paused', 'interrupted', 'stopped') or self.task and not self.task.done() or self.competing(cfg, spec.job_id):
+                raise fail(409, 'Сначала остановите текущие исходящие задания отправителя.')
+            if self.store.rows("SELECT 1 FROM op_items i JOIN op_jobs j ON j.id=i.job WHERE j.telegram_id=? AND i.state='sending' LIMIT 1", (cfg['telegram_id'],)):
+                raise fail(409, 'Дождитесь завершения текущей попытки отправителя.')
+            account = self.ops.readable_account(cfg['account'])
+            client, row, runtime_error = account.client, self.ops.account_row(cfg['account']), account.error
+            peer_error = safe_error(errors.PeerFloodError(None))
+            if row['enabled'] or row['error'] not in (None, peer_error) or runtime_error not in (None, peer_error, 'Telegram: PeerFloodError.'):
+                raise fail(409, 'Общие исходящие должны оставаться на паузе; другие ошибки аккаунта требуют отдельной проверки.')
+            if spec.restriction_digest != self.review_digest(cfg):
+                raise fail(409, 'Сохранённая остановка или отправитель изменились. Обновите состояние.')
+            ctx = dict(config=cfg, account=account, client=client, phase='restriction_review')
+            try:
+                me = await asyncio.wait_for(client.get_me(), 15)
+            except Exception as exc:
+                self.protect(ctx, exc)
+                raise fail(409, 'Подключение не подтверждено; локальная остановка сохранена (' + type(exc).__name__ + ').') from None
+            if (self.ops.accounts.get(cfg['account']) is not account or account.client is not client or
+                not isinstance(me, types.User) or me.id != cfg['telegram_id'] or me.bot or me.deleted or
+                not account.me or account.me.id != cfg['telegram_id'] or
+                self.review_digest(cfg) != spec.restriction_digest or self.competing(cfg, spec.job_id) or self.record(spec.job_id) != record or
+                self.store.rows("SELECT 1 FROM op_items i JOIN op_jobs j ON j.id=i.job WHERE j.telegram_id=? AND i.state='sending' LIMIT 1", (cfg['telegram_id'],))):
+                raise fail(409, 'Аккаунт, остановка или задания изменились во время проверки; остановка сохранена.')
+            review = dict(digest=request_digest, job_id=spec.job_id, account=cfg['account'], telegram_id=cfg['telegram_id'],
+                reviewed_at=now(), reason=spec.reason.strip(), restriction=restriction,
+                method_permission_verified=False, general_outbound_enabled=False, jobs_resumed=False)
+            with self.store.db:
+                # A durable reviewed marker prevents old method history from
+                # re-creating the same local pause after an upgrade/restart.
+                self.store.db.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                    (RESTRICTION_PREFIX + str(cfg['telegram_id']), 'null'))
+                self.store.db.execute('UPDATE op_accounts SET error=NULL WHERE id=? AND telegram_id=? AND enabled=0', (cfg['account'], cfg['telegram_id']))
+                self.store.db.execute('INSERT INTO settings VALUES(?,?)', (REVIEW_PREFIX + spec.request_key, json.dumps(review, ensure_ascii=False)))
+                record['last_direct_invite_review'] = {key: review[key] for key in ('reviewed_at', 'method_permission_verified', 'general_outbound_enabled', 'jobs_resumed')}
+                self.save(record)
+            account.error = None
+            return self.public(record)
 
     def require_unrestricted_outbound(self, config):
         if self.sender_error(config):
@@ -580,16 +786,18 @@ class ManualInviteCampaign(IsolatedInvite):
             self.require_unrestricted_outbound(record['config'])
             ctx = self.proof(spec.candidate_token, record['config'], spec.job_id)
             cfg = record['config']
-            if record['attempts_claimed'] >= cfg['max_attempts'] or ctx['used'] >= cfg['account_day_attempt_cap']:
-                raise fail(409, 'Лимит попыток кампании или отправителя за сутки исчерпан.')
-            if cfg['success_goal'] and self.public(record)['counts']['added'] >= cfg['success_goal']:
-                raise fail(409, 'Цель подтверждённых добавлений достигнута.')
+            limit = self.stop_limit(record, self.public(record)['counts'], ctx['used'])
+            if limit:
+                raise fail(409, 'Цель подтверждённых добавлений достигнута.' if limit == 'verified_goal_reached' else
+                    'Лимит попыток кампании или отправителя за сутки исчерпан.')
             job = self.job(spec.job_id)
             expected_marker = job['spec']['manual_invite_campaign']
             if expected_marker['config_digest'] != digest(cfg) or expected_marker['config'] != cfg:
                 raise fail(409, 'Настройки сохранённого задания изменились.')
             wall = time.time()
-            record.update(state='running', stop_reason=None, pause_requested=False, utc_day=utc_day(), next_at=max(wall, self.ops.account_row(cfg['account'])['not_before']),
+            record['run_baseline'] = {key: self.public(record)['counts'][key] for key in ('attempts', 'added')}
+            record.pop('stop_diagnosis', None)
+            record.update(state='running', stop_reason=None, pause_requested=False, utc_day=utc_day(), next_at=max(wall, record.get('next_at', 0), self.ops.account_row(cfg['account'])['not_before']),
                 expires_at=(int(wall) // 86400 + 1) * 86400, started_at=now())
             with self.store.db:
                 self.store.db.execute("UPDATE op_jobs SET state='paused',updated=? WHERE id=?", (now(), spec.job_id))
@@ -681,10 +889,10 @@ class ManualInviteCampaign(IsolatedInvite):
             cfg = record['config']
             self.require_unrestricted_outbound(cfg)
             ctx = self.context(cfg, time.monotonic() + 25, spec.job_id)
-            if record['attempts_claimed'] >= cfg['max_attempts'] or ctx['used'] >= cfg['account_day_attempt_cap']:
-                raise fail(409, 'Лимит попыток кампании или отправителя за сутки исчерпан.')
-            if cfg['success_goal'] and self.public(record)['counts']['added'] >= cfg['success_goal']:
-                raise fail(409, 'Цель подтверждённых добавлений достигнута.')
+            limit = self.stop_limit(record, self.public(record)['counts'], ctx['used'])
+            if limit:
+                raise fail(409, 'Цель подтверждённых добавлений достигнута.' if limit == 'verified_goal_reached' else
+                    'Лимит попыток кампании или отправителя за сутки исчерпан.')
             if not any(i['state'] == 'pending' for i in self.items(spec.job_id)):
                 raise fail(409, 'В кампании нет ожидающих получателей.')
             try:
@@ -698,8 +906,10 @@ class ManualInviteCampaign(IsolatedInvite):
             if current != record or current_job != job:
                 raise fail(409, 'Сохранённая кампания изменилась во время проверки.')
             wall = time.time()
+            record['run_baseline'] = {key: self.public(record)['counts'][key] for key in ('attempts', 'added')}
+            record.pop('stop_diagnosis', None)
             record.update(state='running', stop_reason=None, pause_requested=False, utc_day=utc_day(),
-                next_at=max(wall, self.ops.account_row(cfg['account'])['not_before']),
+                next_at=max(wall, record.get('next_at', 0), self.ops.account_row(cfg['account'])['not_before']),
                 expires_at=(int(wall) // 86400 + 1) * 86400, started_at=now())
             with self.store.db:
                 self.store.db.execute("UPDATE op_jobs SET state='paused',updated=? WHERE id=?", (now(), spec.job_id))
@@ -788,7 +998,12 @@ class ManualInviteCampaign(IsolatedInvite):
         cfg, record = ctx['config'], ctx['record']
         diagnosis = result.setdefault('diagnosis', {})
         diagnosis.update(source=SCOPE, invitation_requested=requested, request_outcome_unknown=result['state'] == 'uncertain',
-            config_digest=digest(cfg), account=cfg['account'], telegram_id=cfg['telegram_id'], target_id=cfg['target_id'])
+            config_digest=digest(cfg), account=cfg['account'], telegram_id=cfg['telegram_id'], target_id=cfg['target_id'],
+            job_id=ctx['job_id'], item_id=item['id'], user_id=item['user_id'], finished_at=now())
+        diagnosis.setdefault('phase', ctx.get('phase', 'preflight'))
+        diagnosis.setdefault('queue_action', 'stop' if result['state'] in ('uncertain', 'blocked') else 'next_recipient')
+        diagnosis.setdefault('outcome', result['state'])
+        diagnosis['preflight'] = ctx.get('preflight', {})
         with self.store.db:
             self.store.db.execute('UPDATE op_items SET state=?,error=?,diagnosis=?,finished_at=? WHERE id=? AND job=?',
                 (result['state'], result.get('error'), json.dumps(diagnosis, ensure_ascii=False), now(), item['id'], ctx['job_id']))
@@ -796,21 +1011,26 @@ class ManualInviteCampaign(IsolatedInvite):
                 self.store.db.execute('INSERT INTO op_invited VALUES(?,?,?,?) ON CONFLICT(chat_id,user_id) DO NOTHING',
                     (cfg['target_id'], item['user_id'], result['state'], ctx['job_id']))
             if requested:
-                self.store.db.execute('UPDATE op_accounts SET not_before=MAX(not_before,?) WHERE id=? AND telegram_id=?',
-                    (time.time() + cfg['interval_seconds'], cfg['account'], cfg['telegram_id']))
-            record['next_at'] = max(time.time(), self.ops.account_row(cfg['account'])['not_before'])
+                record['queue_not_before'] = time.time() + cfg['interval_seconds']
+            record['next_at'] = max(time.time(), record.get('queue_not_before', record.get('next_at', 0)),
+                self.ops.account_row(cfg['account'])['not_before'])
             self.save(record)
         item['state'] = result['state']
 
     async def step(self, ctx, item):
-        from operations import invite_response_evidence, missing_invitee_diagnosis, invite_rpc_diagnosis, unconfirmed_invite, invite_preflight_failure
+        from operations import invite_response_evidence, missing_invitee_diagnosis, classify_invite_failure, unconfirmed_invite
         requested, before, evidence, after = False, None, None, None
+        verification = []
         cfg = ctx['config']
+        ctx['preflight'] = {}
         try:
+            ctx['phase'] = 'sender_preflight'
             await self.identity(ctx)
+            ctx['phase'] = 'target_preflight'
             group = await self.group(ctx)
             quick = ctx['record'].get('resolution') == ON_DISPATCH
             ref = item['user_name'] if quick and item['user_id'] is None else types.InputPeerUser(item['user_id'], item['user_access_hash'])
+            ctx['phase'] = 'resolve_recipient'
             user = await self.read(ctx, lambda: ctx['client'].get_entity(ref))
             if (not self.eligible(user, cfg['telegram_id']) or
                 (quick and (user.username or '').lower() != item['user_name']) or
@@ -819,29 +1039,46 @@ class ManualInviteCampaign(IsolatedInvite):
                 raise fail(409, 'Личность или имя получателя изменились.')
             if quick and item['user_id'] is None:
                 self.seal_recipient(ctx, item, user)
-            if self.historical(cfg['target_id'], user.id, ctx['job_id']):
-                return dict(state='duplicate_skipped', diagnosis={'code': 'target_history_exists',
-                    'reason': 'Для этого человека уже есть запись о прямом приглашении в эту группу. Новый запрос не отправлен.'}), False, False
+            ctx['phase'] = 'membership_before'
             before = await self.read(ctx, lambda: self.ops.read_membership(ctx['client'], group, user))
+            if before.get('active_ban') is True:
+                return dict(state='duplicate_skipped', diagnosis=dict(code='recipient_banned', member_before=before,
+                    reason='Telegram вернул действующий запрет доступа в группу. Требуется изменение статуса администратором.')), False, False
             if before['member'] is True:
                 return dict(state='already_member', diagnosis={'code': 'member_before_invite', 'member_before': before}), False, False
-            if before['member'] is not False:
+            if before['member'] is not False or (before.get('participant_type') == 'ChannelParticipantBanned' and before.get('active_ban') is None):
                 raise fail(409, 'Отсутствие участника в группе не подтверждено.')
+            if self.historical(cfg['target_id'], user.id, ctx['job_id']):
+                blocker = self.history_retry_blocker(cfg['target_id'], user.id, ctx['job_id'])
+                if blocker or not cfg.get('retry_after_change_confirmed', False):
+                    diagnosis = dict(code=blocker or 'target_history_exists', member_before=before,
+                        retry_after_change=not bool(blocker),
+                        reason=('Сейчас участник отсутствует, но прежний результат приглашения не позволяет безопасный повтор. Новый запрос не отправлен.'
+                            if blocker else 'Сейчас участник отсутствует в группе. Есть история прямого приглашения; отдельное подтверждение повтора не получено. Новый запрос не отправлен.'),
+                        next_action=('Проверьте прежний результат в Telegram и журнале. Подтверждение повтора не снимает блокировку неопределённого результата.'
+                            if blocker else 'После изменения приватности или выхода из группы создайте новую кампанию и отдельно подтвердите повтор для выбранных людей.'))
+                    return dict(state='duplicate_skipped', diagnosis=diagnosis), False, False
+            ctx['phase'] = 'dispatch_guard'
             job = dict(id=ctx['job_id'], account=cfg['account'], telegram_id=cfg['telegram_id'], kind='invite', spec={})
             self.ops.workbench.guard(ctx['account'], job, item, group, user)
             self.claim(ctx, item)
             self.guard(ctx)
             self.ops.workbench.guard(ctx['account'], job, item, group, user)
             requested = True
+            ctx['phase'] = 'invite_rpc'
+            ctx['record']['last_rpc_at'] = now()
+            with self.store.db:
+                self.save(ctx['record'])
             response = await asyncio.wait_for(ctx['client'](functions.channels.InviteToChannelRequest(group, [user])), self.remaining(ctx['deadline']))
+            ctx['phase'] = 'invite_response'
             evidence = invite_response_evidence(response, target_id=cfg['target_id'], user_id=user.id, sender_id=cfg['telegram_id'])
             self.guard(ctx)
             missing = next((m for m in getattr(response, 'missing_invitees', []) if m.user_id == user.id), None)
             if missing:
                 d = missing_invitee_diagnosis(missing)
-                d.update(response=evidence, member_before=before)
+                d.update(response=evidence, member_before=before, outcome='recipient_rejected', queue_action='next_recipient')
                 return dict(state='restricted', diagnosis=d), True, False
-            verification = []
+            ctx['phase'] = 'membership_after'
             for attempt, delay in enumerate((0, 1, 2), 1):
                 if delay:
                     await self.read(ctx, lambda: asyncio.sleep(delay))
@@ -850,7 +1087,7 @@ class ManualInviteCampaign(IsolatedInvite):
                 if after['member'] is True:
                     return dict(state='invited', diagnosis=dict(code='invite_member_verified', member_before=before, member_after=after,
                         response=evidence, verification=verification, retry_after_change=False)), True, False
-            result = unconfirmed_invite('Членство после запроса не подтверждено. Кампания остановлена.', evidence, verification)
+            result = unconfirmed_invite('Telegram вернул ответ на запрос, но последующие проверки не подтвердили членство. Кампания остановлена.', evidence, verification)
             result['diagnosis'].update(member_before=before, member_after=after)
             return result, True, True
         except ResolvedDuplicate:
@@ -861,32 +1098,22 @@ class ManualInviteCampaign(IsolatedInvite):
             if item['state'] == 'sending':
                 self.finish(ctx, item, unconfirmed_invite('Процесс прерван, повтор отключён.', evidence, []), True)
             raise
-        except (errors.FloodWaitError, errors.PeerFloodError, *REVOKED) as exc:
-            self.protect(ctx, exc)
-            result = unconfirmed_invite('Telegram остановил кампанию; автоматического повтора нет.', evidence, []) if item['state'] == 'sending' else dict(state='blocked', diagnosis={})
-            result['diagnosis']['verification_error'] = invite_rpc_diagnosis(exc)
-            return result, requested, True
         except Exception as exc:
-            if item['state'] == 'sending':
-                # Only known recipient privacy restrictions permit advancing.
-                if isinstance(exc, (errors.UserPrivacyRestrictedError, errors.UserNotMutualContactError, errors.UserChannelsTooMuchError, errors.UserKickedError)):
-                    d = invite_rpc_diagnosis(exc)
-                    d.update(member_before=before)
-                    return dict(state='restricted', error=d['reason'], diagnosis=d), requested, False
-                result = unconfirmed_invite('Неизвестный результат: ' + type(exc).__name__ + '. Повтор отключён.', evidence, [])
-                # Preserve safe RPC enums and method, never raw exception/request text.
-                result['diagnosis']['verification_error'] = invite_rpc_diagnosis(exc)
-                result['diagnosis']['member_before'] = before
-                return result, requested, True
-            if (ctx['record'].get('resolution') == ON_DISPATCH and
-                isinstance(exc, (errors.UserPrivacyRestrictedError, errors.UserNotMutualContactError,
-                    errors.UserChannelsTooMuchError, errors.UserKickedError))):
-                d = invite_rpc_diagnosis(exc)
-                d['member_before'] = before
-                return dict(state='restricted', error=d['reason'], diagnosis=d), False, False
-            if isinstance(exc, WorkbenchStopped):
-                return exc.result, False, False
-            return invite_preflight_failure(exc), False, True
+            self.protect(ctx, exc)
+            d = classify_invite_failure(exc, ctx['phase'])
+            if d['queue_action'] == 'next_recipient':
+                state = 'failed' if d['code'] == 'CHAT_MEMBER_ADD_FAILED' else 'restricted'
+                result = dict(state=state, error=d['reason'], diagnosis=dict(d))
+            elif d['outcome'] == 'request_rejected':
+                result = dict(state='blocked', error=d['reason'], diagnosis=dict(d))
+            elif item['state'] == 'sending':
+                result = unconfirmed_invite(d['reason'], evidence, verification)
+            else:
+                result = dict(state='blocked', error=d['reason'], diagnosis={})
+            result['diagnosis'].update(phase=ctx['phase'], verification_error=d, member_before=before, member_after=after,
+                queue_action=d['queue_action'], stop_reason=d['stop_reason'], outcome=d['outcome'], reason=d['reason'])
+            if result['state'] == 'blocked':result['diagnosis']['code'] = d['code']
+            return result, requested, d['queue_action'] == 'stop'
 
     async def worker(self, ctx):
         record, cfg = ctx['record'], ctx['config']
@@ -901,9 +1128,7 @@ class ManualInviteCampaign(IsolatedInvite):
                         self.stop(record, 'paused', 'owner_pause')
                         return
                     counts = self.public(record)['counts']
-                    reason = ('campaign_attempt_cap_reached' if record['attempts_claimed'] >= cfg['max_attempts'] else
-                        'account_day_attempt_cap_reached' if self.attempts_today(cfg['telegram_id']) >= cfg['account_day_attempt_cap'] else
-                        'verified_goal_reached' if cfg['success_goal'] and counts['added'] >= cfg['success_goal'] else None)
+                    reason = self.stop_limit(record, counts, self.attempts_today(cfg['telegram_id']))
                     pending = next((i for i in ctx['items'] if i['state'] == 'pending'), None)
                     if reason or pending is None:
                         self.stop(record, 'paused' if reason == 'account_day_attempt_cap_reached' else 'completed', reason or 'all_selected_processed')
@@ -915,7 +1140,9 @@ class ManualInviteCampaign(IsolatedInvite):
                             return
                         self.finish(ctx, pending, result, requested)
                         if stop:
-                            self.stop(record, 'stopped', result.get('diagnosis', {}).get('code', 'telegram_or_context_stop'))
+                            diagnosis = result.get('diagnosis', {})
+                            record['stop_diagnosis'] = diagnosis.get('verification_error') or {key: diagnosis.get(key) for key in ('code', 'phase', 'reason', 'queue_action')}
+                            self.stop(record, 'stopped', diagnosis.get('stop_reason') or diagnosis.get('code', 'telegram_or_context_stop'))
                             return
                         continue
                 self.wake.clear()
@@ -927,6 +1154,9 @@ class ManualInviteCampaign(IsolatedInvite):
             self.stop(record, 'interrupted', 'worker_cancelled')
             raise
         except Exception as exc:
-            self.stop(record, 'stopped', 'context_stop_' + type(exc).__name__)
+            from operations import classify_invite_failure
+            diagnosis = classify_invite_failure(exc, 'queue_guard')
+            record['stop_diagnosis'] = diagnosis
+            self.stop(record, 'stopped', diagnosis['stop_reason'])
         finally:
             self.active = None

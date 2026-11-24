@@ -193,6 +193,11 @@ class OperationWorkbench:
         return None
 
     def guard(self,a,j,item,entity=None,user=None):
+        if j.get('kind')=='invite':
+            restriction=self.ops.manual_invite_campaign.invite_restriction({'telegram_id':j['telegram_id']})
+            if restriction:
+                raise WorkbenchStopped(dict(state='blocked',error='Прямые приглашения остановлены сохранённым отказом Telegram.',
+                    diagnosis=dict(source='direct_invite_guard',code=restriction['code'],queue_action='stop')))
         window=self.window_stop(j)
         if window:raise WorkbenchStopped(window)
         # Check saved identifiers AND current usernames so renaming does not bypass an ID exclusion.

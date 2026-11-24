@@ -6,6 +6,11 @@ const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../manual-invite-campaign.js'),'utf8');
 const accounts=[{id:'primary',username:'demo_sender',telegram_id:710001001,connection:'connected',enabled:0},{id:'canada_test',username:'canada_test',telegram_id:123456,connection:'connected',enabled:1}];
 const target={id:-100555,title:'Дубай: новый чат',username:'demo_target',managed:true,can_invite:true};
+test('explicit campaign stop diagnosis takes precedence over latest recipient inference',()=>{const api=harness().module._test;const result=api.stopDetails({state:'stopped',stop_reason:'PEER_FLOOD',stop_diagnosis:{code:'PEER_FLOOD',reason:'Telegram остановил прямые приглашения.'},items:[{state:'restricted',diagnosis:{code:'USER_NOT_MUTUAL_CONTACT'}}]});assert.equal(result.code,'PEER_FLOOD');assert.match(result.reason,/ограничил прямые/);});
+test('legacy generic error without RPC enum shows unavailable details',()=>{const api=harness().module._test;const result=api.diagnosisDetails({state:'uncertain',diagnosis:{verification_error:{code:'BadRequestError',reason:'Неизвестный результат',rpc:{message:null}}}});assert.match(result.reason,/Детали недоступны/);assert.equal(result.code,'BadRequestError');});
+test('exact saved RPC rejection is shown without guessing its cause',()=>{const api=harness().module._test;const result=api.diagnosisDetails({state:'failed',diagnosis:{verification_error:{code:'CHAT_MEMBER_ADD_FAILED',rpc:{message:'CHAT_MEMBER_ADD_FAILED'}}}});assert.equal(result.code,'CHAT_MEMBER_ADD_FAILED');assert.match(result.reason,/Точная причина не раскрыта/);});
+test('campaign view separates cumulative and latest run counts, timers, SpamBot and current membership',async()=>{const x=harness();await fillQuick(x);await x.click('quick-draft');x.context.job={...x.context.job,state:'stopped',stop_reason:'PEER_FLOOD',sender_error:'PEER_FLOOD',can_resume:false,counts:{total:30,attempts:24,added:1,restricted:12,uncertain:6,rejected:17,skipped_without_request:1,pending:5},last_run:{started_at:'2026-11-24T01:00:00Z',attempts:3,added:0},next_at:1795482180,telegram_wait_until:1795482240,last_rpc_at:'2026-11-24T01:03:00Z',direct_invite_restriction:{code:'PEER_FLOOD',checked_at:'2026-11-24T01:03:00Z',wait_until:null},spambot:{state:'reply_received',checked_at:'2026-11-24T01:00:00Z',replies:[{date:'2026-11-24T01:00:01Z',text:'No limits <script>bad</script>'}]},items:[{state:'uncertain',user_name:'valid_user',current_membership:{member:false,active_ban:null,checked_at:'2026-11-24T02:00:00Z'}}]};await x.click('status');const html=x.el.innerHTML;for(const text of ['Размер списка</dt><dd>30','Отказы на запрос</dt><dd>17','Пропуски без запроса</dt><dd>1','накопительный счётчик','запросов 3, новых вступлений 0','Это интервал панели','Ожидание Telegram','Последний вызов приглашения','SpamBot: reply_received','Текущее членство: отсутствует','запрет доступа: неизвестно','Исторический результат сохранён'])assert.ok(html.includes(text),text);assert.ok(!html.includes('<script>bad</script>'));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('data-mic="start"'));assert.equal(x.calls.filter(c=>/resume-outbound|spambot-check|quick-start/.test(c.url)).length,0);});
+test('legacy campaigns do not invent a latest run count or server wait',async()=>{const x=harness();await fillQuick(x);await x.click('quick-draft');assert.match(x.el.innerHTML,/точная граница не сохранена/);assert.match(x.el.innerHTML,/серверный срок не передан/);});
 function harness(seed){
  const handlers={},calls=[],timers=new Map(),timerDelays=[];let next=0;const memory=new Map(seed||[]),nodes={};let writes=0,html='';const el={get innerHTML(){return html;},set innerHTML(value){html=value;writes++;},querySelector:selector=>{if(selector==='.cc-error')return null;if(selector==='[aria-invalid="true"]')return Object.values(nodes).find(n=>n.attributes['aria-invalid']==='true')||null;return nodes[selector]??=({attributes:{},textContent:'',innerHTML:'',focused:false,setAttribute(k,v){this.attributes[k]=v;},focus(){this.focused=true;}});},querySelectorAll:()=>[]};
  const context={window:{},document:{querySelector:()=>el,addEventListener:(k,fn)=>{(handlers[k]??=[]).push(fn)}},sessionStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},crypto:require('node:crypto').webcrypto,AbortSignal,Date,URLSearchParams,location:{search:''},console,setTimeout:(fn,delay)=>{timerDelays.push(delay);timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id)};
@@ -18,6 +23,13 @@ function harness(seed){
  return {module,calls,el,event,click,tick,context,nodes,memory,handlers,timers,timerDelays,flush,writes:()=>writes};
 }
 function readyConfig(api){const d=api.initial();Object.assign(d,{account:'primary',telegram_id:710001001,target_id:target.id,users:'@valid_user\n@another_user',consent_note:'Согласие на вступление получено в заявках',consent_confirmed:true});return d;}
+
+async function recoveryFixture(){const x=harness();await fillQuick(x);await x.click('quick-draft');x.context.job={...x.context.job,state:'stopped',sender_error:'PEER_FLOOD',outbound_paused:true,can_resume:false,can_review_restriction:true,restriction_review_digest:'b'.repeat(64),direct_invite_restriction:{code:'PEER_FLOOD',checked_at:'2026-11-25T00:00:00Z',wait_until:null}};await x.click('status');return x;}
+function reviewedJob(job){return {...job,sender_error:null,direct_invite_restriction:null,restriction_review_digest:null,can_review_restriction:false,can_resume:true,last_direct_invite_review:{method_permission_verified:false,general_outbound_enabled:false,jobs_resumed:false}};}
+test('restriction review requires its own acknowledgement and reason before any POST',async()=>{const x=await recoveryFixture();assert.match(x.el.innerHTML,/Пересмотр локальной остановки/);await x.click('review-restriction');assert.equal(x.calls.filter(c=>c.url.endsWith('/review-restriction')).length,0);await x.event('change','restriction_review_confirmed',true);await x.click('review-restriction');assert.match(x.el.innerHTML,/Опишите результат ручной проверки/);assert.equal(x.calls.filter(c=>c.url.endsWith('/review-restriction')).length,0);});
+test('explicit review keeps global pause and requires a separate campaign confirmation',async()=>{const x=await recoveryFixture();x.context.fetchOverride=async(url,options)=>{if(url.endsWith('/review-restriction')){x.context.job=reviewedJob(x.context.job);return response(x.context.job);}};await x.event('input','restriction_review_reason','Проверены ограничения аккаунта в Telegram');await x.event('change','restriction_review_confirmed',true);await x.click('review-restriction');const post=x.calls.find(c=>c.url.endsWith('/review-restriction'));assert.equal(post.body.confirmed,true);assert.equal(post.body.restriction_digest,'b'.repeat(64));assert.equal(post.body.job_id,x.context.job.job_id);assert.match(x.el.innerHTML,/Общие исходящие остаются на паузе/);assert.ok(!x.el.innerHTML.includes('data-mic-restriction-review'));assert.match(x.el.innerHTML,/data-mic="start" disabled/);assert.equal(x.calls.filter(c=>/resume-outbound|quick-start/.test(c.url)).length,0);});
+test('a changed saved restriction clears the acknowledgement and prevents stale review',async()=>{const x=await recoveryFixture();await x.event('input','restriction_review_reason','Проверен прежний отказ Telegram');await x.event('change','restriction_review_confirmed',true);x.context.job={...x.context.job,restriction_review_digest:'c'.repeat(64)};await x.click('status');await x.click('review-restriction');assert.equal(x.calls.filter(c=>c.url.endsWith('/review-restriction')).length,0);assert.match(x.el.innerHTML,/отдельно подтвердите пересмотр/);});
+test('lost review receipt recovers through status without replay or campaign start',async()=>{const x=await recoveryFixture();x.context.fetchOverride=async url=>{if(url.endsWith('/review-restriction')){x.context.job=reviewedJob(x.context.job);throw Error('timeout');}};await x.event('input','restriction_review_reason','Проверены ограничения аккаунта в Telegram');await x.event('change','restriction_review_confirmed',true);await x.click('review-restriction');assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).pendingWrite,'review-restriction');await x.click('review-restriction');assert.equal(x.calls.filter(c=>c.url.endsWith('/review-restriction')).length,1);await x.click('status');assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).pendingWrite,'');assert.equal(x.calls.filter(c=>/resume-outbound|quick-start/.test(c.url)).length,0);});
 test('paused primary is connected, fresh draft has no Canada or group default',()=>{const x=harness(),api=x.module._test;assert.equal(api.connected(accounts[0]),true);assert.equal(api.initial().account,'');assert.equal(api.initial().target_id,null);const c=api.config(readyConfig(api),accounts,[target]);assert.equal(c.account,'primary');assert.equal(c.target_username,'demo_target');assert.equal(c.max_attempts,25);assert.equal(c.interval_seconds,60);assert.equal(c.success_goal,null);});
 test('software limits, sender identity, group rights, duplicates and consent validate',()=>{const api=harness().module._test;for(const [key,value]of [['max_attempts',0],['max_attempts',1001],['account_day_attempt_cap',1.5],['interval_seconds',86401],['success_goal',3],['telegram_id',123456],['consent_confirmed',false],['users','@valid_user @valid_user']]){const d=readyConfig(api);d[key]=value;assert.throws(()=>api.config(d,accounts,[target]),key);}const d=readyConfig(api);Object.assign(d,{max_attempts:1000,account_day_attempt_cap:1000,interval_seconds:1,success_goal:2});assert.equal(api.config(d,accounts,[target]).success_goal,2);assert.throws(()=>api.config(d,accounts,[{...target,can_invite:false}]));});
 test('editing any configuration invalidates proof, confirmation and old job',()=>{const api=harness().module._test,m=api.createModel();m.preview={candidate_token:'old'};m.confirmed=true;m.job={job_id:1};m.saveKey='old';m.edit('interval_seconds',1);assert.equal(m.preview,null);assert.equal(m.confirmed,false);assert.equal(m.job,null);assert.equal(m.saveKey,'');assert.equal(m.revision,1);});
@@ -96,10 +108,10 @@ test('unknown quick save outcome cannot be unlocked before cached lookup reports
 test('lost start response cannot discard job through New campaign before cached status success',async()=>{const x=harness();await fillQuick(x);await x.click('quick-draft');await x.event('change','confirmed',true);x.context.fetchOverride=async url=>{if(url.endsWith('/quick-start'))throw Error('lost ACK');};await x.click('start');const before=JSON.parse(x.memory.get('manual-invite-campaign-v1'));assert.equal(before.pendingWrite,'quick-start');assert.match(x.el.innerHTML,/data-mic="new" disabled/);await x.click('new');const blocked=JSON.parse(x.memory.get('manual-invite-campaign-v1'));assert.equal(blocked.jobId,992);assert.equal(blocked.pendingWrite,'quick-start');assert.equal(blocked.startKey,before.startKey);assert.match(x.el.innerHTML,/Сначала обновите состояние/);await x.click('status');assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).pendingWrite,'');await x.click('new');assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).jobId,null);assert.equal(x.calls.filter(c=>c.url.endsWith('/quick-start')).length,1);});
 
 const job901=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/job901-synthetic.json'),'utf8'));
-test('synthetic job901 uses nested PeerFloodError over invite_membership_unconfirmed in stop cause',()=>{const api=harness().module._test,details=api.stopDetails({...job901,items:[job901.items[2],job901.items[0],job901.items[1]]});assert.equal(details.code,'PeerFloodError');assert.equal(details.reason,job901.items[2].diagnosis.verification_error.reason);assert.equal(details.nested,true);assert.equal(job901.counts.total,3);assert.equal(job901.counts.attempts,3);assert.equal(job901.counts.added,0);});
-test('synthetic job901 renders protective stop cause and recipient-specific mutual/privacy outcomes with unchanged counts',async()=>{const x=harness(),api=x.module._test,c={...api.config(readyConfig(api),accounts,[target]),users:job901.items.map(i=>i.user_name)};x.context.job={...quickRecord(c),...job901,config:c,target,account:c.account,telegram_id:c.telegram_id,can_resume:true,account_attempts_today:3};x.context.location.search='?invite_job=901';await x.module.mount();const stop=x.el.innerHTML.match(/<strong>Причина остановки:<\/strong>([\s\S]*?)<\/p>/)?.[1];assert.match(stop,/PeerFloodError/);assert.match(stop,/Telegram ограничил действия аккаунта/);assert.ok(!stop.includes('требуется взаимный контакт'));assert.match(x.el.innerHTML,/@recipient_mutual[^<]*<span class="mic-item-reason">Telegram отклонил добавление этого получателя: требуется взаимный контакт с отправителем\./);assert.match(x.el.innerHTML,/UserNotMutualContactError/);assert.match(x.el.innerHTML,/настройки приватности получателя запрещают прямое добавление/);assert.match(x.el.innerHTML,/privacy_restricted/);assert.match(x.el.innerHTML,/Подтверждённых новых<\/dt><dd>0/);assert.match(x.el.innerHTML,/Попытки кампании<\/dt><dd>3 из/);assert.match(x.el.innerHTML,/Результаты по участникам \(3\)/);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);});
+test('synthetic job901 uses nested PeerFloodError over invite_membership_unconfirmed in stop cause',()=>{const api=harness().module._test,details=api.stopDetails({...job901,items:[job901.items[2],job901.items[0],job901.items[1]]});assert.equal(details.code,'PeerFloodError');assert.match(details.reason,/Telegram ограничил действия этого аккаунта/);assert.equal(details.nested,true);assert.equal(job901.counts.total,3);assert.equal(job901.counts.attempts,3);assert.equal(job901.counts.added,0);});
+test('synthetic job901 renders protective stop cause and recipient-specific mutual/privacy outcomes with unchanged counts',async()=>{const x=harness(),api=x.module._test,c={...api.config(readyConfig(api),accounts,[target]),users:job901.items.map(i=>i.user_name)};x.context.job={...quickRecord(c),...job901,config:c,target,account:c.account,telegram_id:c.telegram_id,can_resume:true,account_attempts_today:3};x.context.location.search='?invite_job=901';await x.module.mount();const stop=x.el.innerHTML.match(/<strong>Причина остановки:<\/strong>([\s\S]*?)<\/p>/)?.[1];assert.match(stop,/PeerFloodError/);assert.match(stop,/Telegram ограничил действия этого аккаунта/);assert.ok(!stop.includes('требуется взаимный контакт'));assert.match(x.el.innerHTML,/@recipient_mutual[^<]*<span class="mic-item-reason">Telegram потребовал взаимный контакт для этого получателя\./);assert.match(x.el.innerHTML,/UserNotMutualContactError/);assert.match(x.el.innerHTML,/Настройки приватности этого получателя запрещают прямое добавление/);assert.match(x.el.innerHTML,/privacy_restricted/);assert.match(x.el.innerHTML,/Подтверждённых новых<\/dt><dd>0/);assert.match(x.el.innerHTML,/Попытки кампании<\/dt><dd>3 из/);assert.match(x.el.innerHTML,/Результаты по участникам \(3\)/);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);});
 test('unknown diagnostics have honest fallback and raw item error is never exposed',async()=>{const x=harness(),api=x.module._test,c=api.config(readyConfig(api),accounts,[target]);x.context.job={...quickRecord(c),state:'stopped',stop_reason:'unknown_stop',items:[{user_name:'valid_user',state:'uncertain',diagnosis:{},error:'session=PRIVATE_RAW_ERROR'}]};x.context.location.search='?invite_job=992';await x.module.mount();assert.match(x.el.innerHTML,/Причина остановки не уточнена в сохранённом результате/);assert.match(x.el.innerHTML,/Подробная причина не сохранена; проверьте журнал/);assert.ok(!x.el.innerHTML.includes('PRIVATE_RAW_ERROR'));});
-test('diagnostic reason/code rendering escapes HTML and redacts credentials without serializing metadata',async()=>{const x=harness(),api=x.module._test,c=api.config(readyConfig(api),accounts,[target]);x.context.job={...quickRecord(c),state:'stopped',stop_reason:'invite_membership_unconfirmed',items:[{user_name:'valid_user',state:'uncertain',attempted_at:'2026-10-29T06:12:34Z',diagnosis:{code:'invite_membership_unconfirmed',verification_error:{code:'PeerFloodError',reason:'<img src=x onerror=alert(1)> password=TOP_SECRET bot_token=BOT_SECRET session_string=SESSION_SECRET api_hash=HASH_SECRET',rpc:{request:{secret:'METADATA_SECRET'}}}},error:'RAW_ERROR_SECRET'}]};x.context.location.search='?invite_job=992';await x.module.mount();assert.ok(x.el.innerHTML.includes('&lt;img'));assert.ok(!x.el.innerHTML.includes('<img src=x'));for(const secret of ['TOP_SECRET','BOT_SECRET','SESSION_SECRET','HASH_SECRET','METADATA_SECRET','RAW_ERROR_SECRET'])assert.ok(!x.el.innerHTML.includes(secret),secret);assert.match(x.el.innerHTML,/PeerFloodError/);assert.match(x.el.innerHTML,/\[скрыто\]/);const invalid=api.diagnosisDetails({state:'restricted',diagnosis:{code:'<script>alert(1)</script>',reason:'Текст причины'}});assert.equal(invalid.code,null);});
+test('RPC diagnosis uses local guidance and omits raw HTML, credentials and metadata',async()=>{const x=harness(),api=x.module._test,c=api.config(readyConfig(api),accounts,[target]);x.context.job={...quickRecord(c),state:'stopped',stop_reason:'invite_membership_unconfirmed',items:[{user_name:'valid_user',state:'uncertain',attempted_at:'2026-10-29T06:12:34Z',diagnosis:{code:'invite_membership_unconfirmed',verification_error:{code:'PeerFloodError',reason:'<img src=x onerror=alert(1)> password=TOP_SECRET bot_token=BOT_SECRET session_string=SESSION_SECRET api_hash=HASH_SECRET',rpc:{request:{secret:'METADATA_SECRET'}}}},error:'RAW_ERROR_SECRET'}]};x.context.location.search='?invite_job=992';await x.module.mount();assert.ok(!x.el.innerHTML.includes('&lt;img'));assert.ok(!x.el.innerHTML.includes('<img src=x'));for(const secret of ['TOP_SECRET','BOT_SECRET','SESSION_SECRET','HASH_SECRET','METADATA_SECRET','RAW_ERROR_SECRET'])assert.ok(!x.el.innerHTML.includes(secret),secret);assert.match(x.el.innerHTML,/PeerFloodError/);assert.match(x.el.innerHTML,/Telegram ограничил действия этого аккаунта/);const invalid=api.diagnosisDetails({state:'restricted',diagnosis:{code:'<script>alert(1)</script>',reason:'Текст причины'}});assert.equal(invalid.code,null);});
 test('known manual pause reason stays authoritative and pending users do not acquire fabricated errors',()=>{const api=harness().module._test;assert.equal(api.stopDetails({...job901,state:'paused',stop_reason:'owner_pause'}).reason,'Пауза по вашей команде');assert.equal(api.diagnosisDetails({state:'pending',diagnosis:{}}),null);assert.equal(api.diagnosisDetails({state:'restricted',diagnosis:{code:'UserNotMutualContactError'}}).reason,'Telegram потребовал взаимный контакт для этого получателя.');});
 
 test('recorded PeerFlood permits saving a draft but blocks explicit start without any start POST',async()=>{const x=harness();await fillQuick(x);x.context.fetchOverride=async(url,options)=>{if(url.endsWith('/quick-draft')){x.context.job={...quickRecord(JSON.parse(options.body).config),sender_error:'Telegram ограничил действия аккаунта (PeerFloodError).'};return response(x.context.job);}};await x.click('quick-draft');assert.match(x.el.innerHTML,/Кампания сохранена/);assert.match(x.el.innerHTML,/Исходящие остановлены: Telegram ограничил/);assert.match(x.el.innerHTML,/Сохранение кампании не приглашает людей и остаётся доступно/);await x.event('change','confirmed',true);assert.match(x.el.innerHTML,/data-mic="start" disabled/);await x.click('start');assert.equal(x.calls.filter(c=>c.url.endsWith('/quick-start')).length,0);assert.equal(x.calls.filter(c=>c.url.endsWith('/quick-draft')).length,1);assert.equal(x.calls.filter(c=>c.url.includes('/preview')).length,0);});
@@ -111,3 +123,139 @@ test('saved PeerFlood banner separates connected session, historical refusal and
 test('synthetic job901 stop time/code is labelled only as that campaign stop, never latest account failure',async()=>{const x=harness(),api=x.module._test,c={...api.config(readyConfig(api),accounts,[target]),users:job901.items.map(i=>i.user_name)};x.context.job={...quickRecord(c),...job901,config:c,target,account:c.account,telegram_id:c.telegram_id,sender_error:'PeerFloodError',can_resume:false};x.context.location.search='?invite_job=901';await x.module.mount();const stop=x.el.innerHTML.match(/<p class="cc-help" data-mic-recorded-stop>([\s\S]*?)<\/p>/)?.[1];assert.match(stop,/Последняя сохранённая остановка этой кампании №901/);assert.match(stop,/datetime="2020-01-01T00:00:00\.000000\+00:00"/);assert.match(stop,/PeerFloodError/);assert.match(stop,/а не время последней ошибки аккаунта/);assert.ok(!x.el.innerHTML.includes('Последняя ошибка аккаунта:'));assert.equal(x.calls.filter(c=>c.method==='POST').length,0);});
 test('revoked or disconnected account copy uses reported connection state and does not invent PeerFlood deadline',async()=>{const x=harness(),api=x.module._test,c=api.config(readyConfig(api),accounts,[target]);x.context.job={...quickRecord(c),sender_error:'SessionRevokedError: сессия отозвана'};x.context.location.search='?invite_job=992';x.context.fetchOverride=async url=>url==='/api/scanner/operations'?response({accounts:accounts.map(a=>({...a,connection:a.id==='primary'?'not_connected':a.connection})),jobs:[]}):undefined;await x.module.mount();assert.match(x.el.innerHTML,/Соединение в последнем ответе панели: <strong>не подключено<\/strong>/);assert.match(x.el.innerHTML,/сохранённая причина остановки/);assert.ok(!x.el.innerHTML.includes('PeerFloodError срок окончания'));assert.match(x.el.innerHTML,/data-mic="start" disabled/);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);});
 test('unknown campaign timestamp stays unknown and explanatory rendering issues no checks or controls',()=>{const x=harness(),api=x.module._test,before=x.calls.length;const html=api.recordedStopView({job_id:99,state:'stopped',stop_reason:'unknown_code',stopped_at:'not-a-date',items:[]});assert.match(html,/время остановки не передано/);assert.match(html,/№99/);assert.ok(!html.includes('Invalid Date'));assert.equal(x.calls.length,before);});
+
+test('historical retry is a separate opt in, invalidates old proof and resets for new campaign',async()=>{
+ const x=harness(),api=x.module._test;
+ assert.equal(api.initial().retry_after_change_confirmed,false);
+ assert.equal(api.config(readyConfig(api),accounts,[target]).retry_after_change_confirmed,false);
+ await newPreview(x);await x.tick();
+ assert.match(x.el.innerHTML,/data-mic-field="retry_after_change_confirmed"[^>]*>/);
+ assert.match(x.el.innerHTML,/Неопределённые и выполняющиеся прежние попытки остаются заблокированы/);
+ const count=x.calls.length;
+ await x.event('change','retry_after_change_confirmed',true);
+ assert.equal(x.calls.length,count);
+ assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).draft.retry_after_change_confirmed,true);
+ await x.click('draft');assert.ok(!x.calls.some(c=>c.url.endsWith('/draft')));
+ await x.click('preview');
+ assert.equal(x.calls.filter(c=>c.url.endsWith('/preview')).at(-1).body.retry_after_change_confirmed,true);
+ await x.click('new');
+ assert.equal(JSON.parse(x.memory.get('manual-invite-campaign-v1')).draft.retry_after_change_confirmed,false);
+ assert.ok(!x.calls.some(c=>/start|resume-outbound/.test(c.url)));
+});
+
+test('history skip diagnosis distinguishes absence and unresolved prior result',()=>{
+ const api=harness().module._test;
+ const d=api.diagnosisDetails({state:'duplicate_skipped',diagnosis:{code:'target_history_unresolved',reason:'Сейчас участник отсутствует, но прежний результат приглашения не позволяет безопасный повтор.'}});
+ assert.equal(d.code,'target_history_unresolved');assert.match(d.reason,/отсутствует/);
+});
+
+
+test('retry acknowledgement resets whenever account, target or selected list changes',()=>{
+ const api=harness().module._test;
+ for(const key of ['account','target_id','users']){
+  const m=api.createModel();m.draft.retry_after_change_confirmed=true;
+  m.edit(key,key==='target_id'?-100555:'new_value');
+  assert.equal(m.draft.retry_after_change_confirmed,false,key);
+ }
+});
+
+test('saved empty InvitedUsers response is explained separately from unknown transport',()=>{
+ const api=harness().module._test;
+ const saved={state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed',reason:'Членство после запроса не подтверждено.',response:{response_type:'InvitedUsers',missing_invitees_count:0,update_types:[]},verification:[{member:false},{member:false},{member:false}]}};
+ assert.match(api.diagnosisDetails(saved).reason,/Telegram вернул ответ/);
+ assert.match(api.diagnosisDetails(saved).reason,/Повтор отключён/);
+ assert.ok(!api.diagnosisDetails(saved).reason.includes('приватност'));
+ const transport={state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed',reason:'Неизвестный результат: TimeoutError. Повтор отключён.',response:{},verification:[]}};
+ assert.match(api.diagnosisDetails(transport).reason,/неизвестен/);
+ assert.ok(!api.diagnosisDetails(transport).reason.includes('вернул ответ'));
+});
+
+async function membershipFixture(){
+ const x=harness();await newPreview(x);await x.tick();await x.click('draft');
+ x.context.job={...x.context.job,state:'stopped',stop_reason:'invite_membership_unconfirmed',can_resume:false,counts:{total:1,attempts:1,added:0,uncertain:1},items:[{id:41,user_id:5550011,user_name:'valid_user',state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed',response:{response_type:'InvitedUsers'},verification:[{member:false}]}}]};
+ await x.click('status');return x;
+}
+function membershipResponse(member=false,extra={}){return {ok:true,json:async()=>({account:'primary',sender_id:710001001,target:target.id,user_id:5550011,member,checked_at:'2026-11-19T14:08:12+00:00',attribution:'current_membership_only',invitation_requested:false,history_changed:false,...extra})};}
+const membershipCalls=x=>x.calls.filter(c=>c.url.endsWith('/membership'));
+
+test('persisted item offers explicit current participation check; view and GET never send invitations or alter historical count',async()=>{
+ const x=await membershipFixture();assert.equal(membershipCalls(x).length,0);
+ assert.match(x.el.innerHTML,/data-mic="membership:41">Проверить участие/);
+ const writes=x.calls.filter(c=>c.method==='POST').length;
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(false):undefined;
+ await x.click('membership:41');
+ assert.equal(membershipCalls(x).length,1);assert.equal(membershipCalls(x)[0].method,'GET');
+ assert.equal(membershipCalls(x)[0].url,'/api/scanner/operations/jobs/991/items/41/membership');
+ assert.match(x.el.innerHTML,/Сейчас не состоит в группе/);assert.match(x.el.innerHTML,/datetime="2026-11-19T14:08:12\+00:00"/);
+ assert.match(x.el.innerHTML,/а не подтверждение результата прежнего приглашения/);
+ assert.match(x.el.innerHTML,/История и счётчик добавлений не изменены/);
+ assert.match(x.el.innerHTML,/Результат не подтверждён/);
+ assert.equal(x.context.job.counts.added,0);assert.equal(x.context.job.items[0].state,'uncertain');
+ assert.equal(x.calls.filter(c=>c.method==='POST').length,writes);
+ assert.ok(!x.calls.some(c=>/start|retry|resume-outbound/.test(c.url)));
+});
+
+test('membership loading blocks duplicate click; current true and unknown remain separate from past invite',async()=>{
+ const x=await membershipFixture();let finish;
+ x.context.fetchOverride=url=>url.endsWith('/membership')?new Promise(resolve=>{finish=resolve}):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверяем текущее участие/);
+ assert.match(x.el.innerHTML,/data-mic="membership:41" disabled/);
+ await x.click('membership:41');assert.equal(membershipCalls(x).length,1);
+ finish(membershipResponse(true));await x.flush();
+ assert.match(x.el.innerHTML,/Сейчас состоит в группе/);assert.equal(x.context.job.items[0].state,'uncertain');
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(null):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Текущее участие не подтверждено/);
+});
+
+test('membership errors use safe local instructions and preserve historical result',async()=>{
+ const x=await membershipFixture();
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?{ok:false,status:409,json:async()=>({detail:'RAW request=session-secret /private/client/file'})}:undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверка не подтверждена/);
+ assert.match(x.el.innerHTML,/Приглашение не отправлялось/);assert.ok(!x.el.innerHTML.includes('session-secret'));assert.ok(!x.el.innerHTML.includes('/private/client/file'));
+ assert.equal(x.context.job.items[0].state,'uncertain');
+ x.context.fetchOverride=async url=>url.endsWith('/membership')?membershipResponse(true,{user_id:99999}):undefined;
+ await x.click('membership:41');assert.match(x.el.innerHTML,/Проверка не подтверждена/);assert.ok(!x.el.innerHTML.includes('Сейчас состоит в группе'));
+});
+
+test('late membership read after remount does not attach to another recipient or persist result',async()=>{
+ const x=await membershipFixture();let finish;
+ x.context.fetchOverride=url=>url.endsWith('/membership')?new Promise(resolve=>{finish=resolve}):undefined;
+ await x.click('membership:41');x.module.unmount();
+ x.context.job={...x.context.job,items:[{id:42,user_id:5550022,user_name:'another_user',state:'uncertain',diagnosis:{code:'invite_membership_unconfirmed'}}]};
+ await x.module.mount();const before=x.memory.get('manual-invite-campaign-v1');
+ finish(membershipResponse(true));await x.flush();
+ assert.ok(!x.el.innerHTML.includes('Сейчас состоит в группе'));assert.ok(!x.el.innerHTML.includes('Проверяем текущее участие'));
+ assert.match(x.el.innerHTML,/membership:42/);assert.equal(x.memory.get('manual-invite-campaign-v1'),before);
+});
+
+test('known Telegram enums have safe actionable guidance, unknown RPC raw text is excluded',()=>{
+ const api=harness().module._test;
+ for(const code of ['UserPrivacyRestrictedError','UserNotMutualContactError','UserChannelsTooMuchError','ChatAdminRequiredError','PeerFloodError','FloodWaitError']){
+  const d=api.diagnosisDetails({state:'restricted',diagnosis:{source:'rpc_error',code,reason:'RAW_EXCEPTION request=user phone 123'}});
+  assert.ok(d.nextAction.length>10,code);assert.ok(!d.reason.includes('RAW_EXCEPTION'),code);
+ }
+ const raw=api.diagnosisDetails({state:'uncertain',diagnosis:{verification_error:{code:'BadRequestError',reason:'RAW_EXCEPTION contacts phone',rpc:{message:'UNKNOWN_NEW_RPC'}}}});
+ assert.ok(!raw.reason.includes('RAW_EXCEPTION'));assert.match(raw.reason,/автоматического повтора нет/);
+ const safe=api.diagnosisDetails({state:'restricted',diagnosis:{source:'rpc_error',code:'BadRequestError',reason:'RAW_EXCEPTION',rpc:{message:'USER_PRIVACY_RESTRICTED'}}});
+ assert.match(safe.nextAction,/разрешение на добавление/);
+});
+
+test('resume blocker explains unavailable continuation without exposing a start control',async()=>{
+ const x=await membershipFixture();x.context.job={...x.context.job,state:'paused',counts:{total:2,pending:1,attempts:1,added:0},resume_block_reason:'account_day_attempt_cap_reached',can_resume:false};
+ await x.click('status');assert.match(x.el.innerHTML,/Продолжение недоступно/);assert.match(x.el.innerHTML,/Дневной предел попыток аккаунта исчерпан/);
+ assert.ok(!x.el.innerHTML.includes('data-mic="start"'));
+});
+
+test('active campaign disables participation checking and unresolved usernames have no check control',async()=>{
+ const x=await membershipFixture();x.context.job={...x.context.job,state:'running',can_pause:true};await x.click('status');
+ assert.match(x.el.innerHTML,/data-mic="membership:41" disabled/);await x.click('membership:41');assert.equal(membershipCalls(x).length,0);
+ x.context.job={...x.context.job,state:'draft',items:[{id:41,user_id:null,user_name:'valid_user',state:'pending'}]};await x.click('status');
+ assert.ok(!x.el.innerHTML.includes('data-mic="membership:41"'));
+});
+
+
+test('manual unknown error class never renders raw exception text',()=>{
+ const api=harness().module._test;
+ const d=api.diagnosisDetails({state:'failed',diagnosis:{source:'manual-invite-campaign-v1',code:'BadRequestError',reason:'RAW_EXCEPTION request secret private phone'}});
+ assert.ok(!d.reason.includes('RAW_EXCEPTION'));assert.match(d.reason,/Детали недоступны/);
+});
